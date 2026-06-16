@@ -1,0 +1,17 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - echo "No dependencies to install for the static frontend."
+    build:
+      commands:
+        - echo "No build step. Publishing the static files in public/ as-is."
+  artifacts:
+    # The site is plain HTML/CSS/JS served from public/. There is no bundler,
+    # so the published directory is public/ — not a generated dist/ folder.
+    baseDirectory: public
+    files:
+      - '**/*'
+  cache:
+    paths: []
