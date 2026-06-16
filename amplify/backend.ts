@@ -60,6 +60,15 @@ const sharedEnv: Record<string, string> = {
   // The public site origin, used to build Stripe success/cancel URLs.
   APP_URL: "https://noahscompany.com",
 
+  // Blank by default so the backend deploys with no setup. The app degrades
+  // gracefully: empty Stripe keys -> checkout shows "Stripe setup needed"; empty
+  // ADMIN_TOKEN -> coach view returns 503. Fill these in (and ideally move
+  // STRIPE_SECRET_KEY / ADMIN_TOKEN to Amplify secrets) to go live.
+  STRIPE_SECRET_KEY: "",
+  STRIPE_WEBHOOK_SECRET: "",
+  STRIPE_GROUP_PRICE_ID: "",
+  ADMIN_TOKEN: "",
+
   // Optional — leave blank until you use them.
   STRIPE_PRIVATE_PRICE_ID: "",
   CONTACT_EMAIL: "",

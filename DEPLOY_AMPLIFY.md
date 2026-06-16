@@ -48,17 +48,17 @@ environment that has AWS access for the target account.
 >
 > ### Steps
 > 1. `npm ci` (a `package-lock.json` is committed).
-> 2. **Set the required secrets** (these are referenced via `secret()` in
->    `amplify/functions/*/resource.ts`; the backend deploy fails if any is
->    missing). Use Stripe **test** values first:
->    - `STRIPE_SECRET_KEY`
->    - `STRIPE_WEBHOOK_SECRET` (set a placeholder now; get the real value in
->      step 6 and update it)
->    - `STRIPE_GROUP_PRICE_ID`
->    - `ADMIN_TOKEN` (any long random string)
->    Set them for a personal sandbox with `npx ampx sandbox secret set <NAME>`,
->    and for the `main` branch via the Amplify console (App settings → Secrets) or
->    `npx ampx sandbox secret set --branch main <NAME>`.
+> 2. **Set configuration values.** The backend deploys with these **blank** (the
+>    app degrades gracefully — empty Stripe keys show "Stripe setup needed", an
+>    empty `ADMIN_TOKEN` returns 503), so an initial deploy needs no setup. To
+>    enable payments and the coach view, set them (Stripe **test** values first):
+>    - `STRIPE_SECRET_KEY`, `STRIPE_GROUP_PRICE_ID` — enable checkout
+>    - `ADMIN_TOKEN` — enable the coach view (any long random string)
+>    - `STRIPE_WEBHOOK_SECRET` — from the webhook you create in step 6
+>    Quickest: edit `sharedEnv` in `amplify/backend.ts`. **Better for production
+>    (Hardening):** convert `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and
+>    `ADMIN_TOKEN` to `secret("NAME")` in the resource files and set them with
+>    `npx ampx sandbox secret set <NAME>` (sandbox) or the Amplify console (main).
 > 3. **Edit `amplify/backend.ts` → `sharedEnv`**: set `APP_URL` to the public site
 >    origin (`https://noahscompany.com`). Optionally set `CONTACT_EMAIL`,
 >    `CONTACT_PHONE`, `COACH_EMAIL`, `STRIPE_PRIVATE_PRICE_ID`, and the display
@@ -104,15 +104,21 @@ environment that has AWS access for the target account.
 
 ---
 
-## Quick reference: required secrets
+## Quick reference: configuration values
 
-| Secret | Required | Notes |
+All of these live in `amplify/backend.ts` (`sharedEnv`) and are **blank by
+default** — the backend deploys without them and degrades gracefully. Fill them
+in to turn features on.
+
+| Value | Needed for | Notes |
 | --- | --- | --- |
-| `STRIPE_SECRET_KEY` | yes | Stripe secret key (test then live) |
-| `STRIPE_WEBHOOK_SECRET` | yes | From the Stripe webhook you create in step 6 |
-| `STRIPE_GROUP_PRICE_ID` | yes | Stripe Price id for group training |
-| `ADMIN_TOKEN` | yes | Long random string for the coach view |
-
-Optional config lives in `amplify/backend.ts` (`sharedEnv`): `APP_URL`,
-`CONTACT_EMAIL`, `CONTACT_PHONE`, `COACH_EMAIL`, `RESEND_API_KEY`, `MAIL_FROM`,
-`STRIPE_PRIVATE_PRICE_ID`, `GROUP_DISPLAY_PRICE`, `PRIVATE_DISPLAY_PRICE`.
+| `STRIPE_SECRET_KEY` | checkout | Stripe secret key (test then live); harden to a secret |
+| `STRIPE_GROUP_PRICE_ID` | checkout | Stripe Price id for group training |
+| `STRIPE_WEBHOOK_SECRET` | confirming payment | From the webhook in step 6; harden to a secret |
+| `ADMIN_TOKEN` | coach view | Long random string; harden to a secret |
+| `APP_URL` | Stripe redirect URLs | Set to `https://noahscompany.com` |
+| `CONTACT_EMAIL` / `CONTACT_PHONE` | footer + emails | Optional |
+| `COACH_EMAIL` | new-signup alerts | Optional; defaults to `CONTACT_EMAIL` |
+| `RESEND_API_KEY` / `MAIL_FROM` | confirmation emails | Optional |
+| `STRIPE_PRIVATE_PRICE_ID` | 1-on-1 checkout | Optional |
+| `GROUP_DISPLAY_PRICE` / `PRIVATE_DISPLAY_PRICE` | price labels | Optional |
