@@ -18,17 +18,22 @@ Ruby would work, but for this folder Node.js keeps the frontend and backend in o
 ## Data to store
 
 - registration id
+- group id (links siblings registered in one checkout)
 - camp id
-- camp title and dates at signup time
-- calendar color for schedule display
+- camp title, dates, time, location, and notes at signup time
 - training type
 - camper name and age
 - parent name, email, and phone
+- emergency contact name and phone
+- allergy or medical notes
 - player goals or notes
 - waiver acceptance timestamp
 - Stripe checkout session id
 - Stripe payment status
 - amount and currency from Stripe
+
+One registration is stored per child. A multi-child signup creates several
+registrations that share a group id, and the webhook marks the whole group paid.
 
 Do not store card numbers. Stripe Checkout handles card data.
 

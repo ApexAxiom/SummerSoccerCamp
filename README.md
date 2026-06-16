@@ -20,9 +20,11 @@ When no camp file exists yet, the app creates an editable starter summer schedul
 1. Set `ADMIN_TOKEN` in `.env`.
 2. Open `http://localhost:4242/admin.html`.
 3. Enter the admin token.
-4. Edit each camp's start/end dates, color, time, location, capacity, and price label. Noah can add overlapping camps, one-day sessions, close signup, or archive dates he is no longer offering.
-5. Parents pick a camp from the public calendar, fill out the signup form, and continue to Stripe.
-6. Noah sees each camp's roster with pending checkout and paid counts.
+4. Edit each camp's start/end dates, color, time, location, capacity, and price label. Noah can add overlapping camps, one-day sessions, close signup, or archive dates he is no longer offering. The "Notes for parents" field (what to bring, focus for the week) now shows on the public calendar and on each family's confirmation.
+5. Parents pick a camp from the public calendar, fill out the signup form, and continue to Stripe. They can register more than one child in a single checkout, and the form collects an emergency contact plus any allergy/medical notes.
+6. Noah sees each camp's roster with pending checkout and paid counts, including each child's emergency contact and medical notes. He can download a CSV, print field-ready rosters, or email a camp's parents in one click.
+
+When `RESEND_API_KEY` and `MAIL_FROM` are set, a paid signup sends the parent a confirmation (camp date, time, location, what to bring) and notifies the coach. Without those keys the payment is still recorded and the email is logged instead of sent.
 
 ## Stripe backend choice
 
@@ -52,6 +54,14 @@ Optional display labels:
 - `PRIVATE_DISPLAY_PRICE`
 
 Keep Stripe Price IDs as the payment source of truth. The display labels are only convenience text.
+
+Optional contact and email:
+
+- `CONTACT_EMAIL`: shown in the footer/FAQ and used in confirmation emails.
+- `CONTACT_PHONE`: shown in the footer/FAQ.
+- `RESEND_API_KEY`: enables sending confirmation and coach-notification emails through Resend.
+- `MAIL_FROM`: the verified from-address for those emails.
+- `COACH_EMAIL`: where new-signup alerts go. Defaults to `CONTACT_EMAIL`.
 
 ## Checks
 

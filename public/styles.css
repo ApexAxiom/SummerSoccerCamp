@@ -977,6 +977,149 @@ textarea:focus {
   color: var(--navy);
 }
 
+.children-list {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.child-row {
+  background: #f6f7f2;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.child-row-head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.child-row-title {
+  color: var(--navy);
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.link-button {
+  background: none;
+  border: 0;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 750;
+  padding: 4px;
+}
+
+.add-child {
+  margin-bottom: 18px;
+  width: 100%;
+}
+
+.optional {
+  color: var(--muted);
+  font-style: normal;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.selected-camp-notes {
+  background: #f6f7f2;
+  border-radius: 6px;
+  color: #344135;
+  font-size: 0.85rem;
+  font-weight: 650;
+  margin-top: 8px;
+  padding: 8px 10px;
+}
+
+.faq-section {
+  background: #edf4ee;
+}
+
+.faq-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  margin-top: 28px;
+}
+
+.faq-item {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(16, 35, 63, 0.06);
+  padding: 20px;
+}
+
+.faq-item h3 {
+  color: var(--navy);
+  font-size: 1.05rem;
+  margin: 0 0 8px;
+}
+
+.faq-item p {
+  color: var(--muted);
+  margin: 0;
+}
+
+.footer-main {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+
+.contact-info a {
+  color: rgba(255, 255, 255, 0.86);
+  font-weight: 750;
+}
+
+.contact-info a:hover {
+  color: var(--white);
+}
+
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.medical-flag {
+  background: #fff4f2;
+  border-radius: 6px;
+  color: var(--danger);
+  font-size: 0.82rem;
+  font-weight: 750;
+  padding: 4px 8px;
+}
+
+.success-details {
+  background: #f6f7f2;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 26px auto 0;
+  max-width: 440px;
+  padding: 20px 22px;
+  text-align: left;
+}
+
+.success-details li {
+  color: #344135;
+}
+
+.success-details strong {
+  color: var(--navy);
+}
+
 @media (max-width: 860px) {
   .topbar {
     align-items: flex-start;
@@ -1082,5 +1225,50 @@ textarea:focus {
   .section {
     padding-left: 16px;
     padding-right: 16px;
+  }
+}
+
+@media print {
+  .topbar,
+  .admin-actions,
+  .admin-login,
+  .camp-form,
+  .form-section-head,
+  #admin-message,
+  .footer,
+  .nav,
+  .camp-stats button {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  .admin-shell {
+    max-width: none;
+  }
+
+  .camp-admin-card {
+    border: 1px solid #000;
+    box-shadow: none;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 14px;
+  }
+
+  .roster-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .roster-row a,
+  .medical-flag {
+    color: #000;
+  }
+
+  .section {
+    padding: 0;
   }
 }

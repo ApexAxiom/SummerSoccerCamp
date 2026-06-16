@@ -3,6 +3,8 @@
   const message = document.querySelector("#admin-message");
   const dashboard = document.querySelector("#dashboard");
   const refreshButton = document.querySelector("#refresh-button");
+  const exportButton = document.querySelector("#export-button");
+  const printButton = document.querySelector("#print-button");
   const adminContent = document.querySelector("#admin-content");
   const campForm = document.querySelector("#camp-form");
   const saveCampButton = document.querySelector("#save-camp-button");
@@ -88,8 +90,8 @@
     campForm.elements.trainingType.value = "group";
     campForm.elements.ageMin.value = "5";
     campForm.elements.ageMax.value = "12";
-    campForm.elements.capacity.value = "20";
-    campForm.elements.color.value = "blue";
+    campForm.elements.capacity.value = "12";
+    campForm.elements.color.value = "green";
     campForm.elements.status.value = "open";
     if (campFormTitle) campFormTitle.textContent = "Add a camp or day";
     if (campFormHelp) {
@@ -164,6 +166,7 @@
               <span>${escapeHtml(camp.spotsLeft)} spots left</span>
               <span>${escapeHtml(counts.paid)} paid · ${escapeHtml(counts.pending)} pending</span>
               <button class="button secondary compact" type="button" data-edit-camp="${escapeHtml(camp.id)}">Edit camp</button>
+              <button class="button secondary compact" type="button" data-email-camp="${escapeHtml(camp.id)}">Email parents</button>
               <button class="button secondary compact" type="button" data-toggle-status="${escapeHtml(camp.id)}">
                 ${camp.status === "open" ? "Close signup" : "Open signup"}
               </button>
@@ -203,6 +206,27 @@
         await updateCampStatus(button.dataset.restoreCamp, "closed");
       });
     });
+
+    dashboard.querySelectorAll("[data-email-camp]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const camp = latestCamps.find((item) => item.id === button.dataset.emailCamp);
+        if (camp) emailParents(camp);
+      });
+    });
+  }
+
+  function activeRoster(camp) {
+    return (camp.roster || []).filter((item) => item.status !== "expired" && item.status !== "checkout_failed");
+  }
+
+  function emailParents(camp) {
+    const emails = Array.from(new Set(activeRoster(camp).map((item) => item.parentEmail).filter(Boolean)));
+    if (!emails.length) {
+      setMessage("No parents to email for this camp yet.", "info");
+      return;
+    }
+    const subject = `${camp.title} (${campDateRange(camp)})`;
+    window.location.href = `mailto:?bcc=${encodeURIComponent(emails.join(","))}&subject=${encodeURIComponent(subject)}`;
   }
 
   function renderRoster(roster) {
@@ -218,12 +242,14 @@
               <span class="pill" data-status="${escapeHtml(item.status)}">${statusLabel(item.status)}</span>
               <strong>${escapeHtml(item.camperName)}</strong>
               <span>Age ${escapeHtml(item.camperAge)}</span>
+              ${item.medicalNotes ? `<span class="medical-flag">Medical: ${escapeHtml(item.medicalNotes)}</span>` : ""}
               ${item.goals ? `<span class="muted">${escapeHtml(item.goals)}</span>` : ""}
             </div>
             <div>
               <strong>${escapeHtml(item.parentName)}</strong>
               <a href="mailto:${escapeHtml(item.parentEmail)}">${escapeHtml(item.parentEmail)}</a>
-              <a href="tel:${escapeHtml(String(item.parentPhone).replace(/[^\\d+]/g, ""))}">${escapeHtml(item.parentPhone)}</a>
+              <a href="tel:${escapeHtml(String(item.parentPhone).replace(/[^\d+]/g, ""))}">${escapeHtml(item.parentPhone)}</a>
+              ${item.emergencyName ? `<span class="muted">Emergency: ${escapeHtml(item.emergencyName)} · ${escapeHtml(item.emergencyPhone || "")}</span>` : ""}
               <span>${money(item.amountTotal, item.currency)}</span>
             </div>
           </div>
@@ -306,6 +332,52 @@
     }
   }
 
+  function csvCell(value) {
+    const str = String(value ?? "");
+    return /[",\n\r]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+  }
+
+  function buildCsv() {
+    const headers = ["Camp", "Dates", "Status", "Camper", "Age", "Parent", "Email", "Phone", "Emergency contact", "Emergency phone", "Allergies/Medical", "Goals", "Amount"];
+    const rows = [headers];
+    latestCamps.forEach((camp) => {
+      (camp.roster || []).forEach((item) => {
+        rows.push([
+          camp.title,
+          campDateRange(camp),
+          statusLabel(item.status),
+          item.camperName,
+          item.camperAge,
+          item.parentName,
+          item.parentEmail,
+          item.parentPhone,
+          item.emergencyName || "",
+          item.emergencyPhone || "",
+          item.medicalNotes || "",
+          item.goals || "",
+          typeof item.amountTotal === "number" ? (item.amountTotal / 100).toFixed(2) : "",
+        ]);
+      });
+    });
+    return rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
+  }
+
+  function downloadCsv() {
+    if (!latestCamps.some((camp) => (camp.roster || []).length)) {
+      setMessage("No registrations to export yet.", "info");
+      return;
+    }
+    const blob = new Blob([buildCsv()], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `noah-soccer-rosters-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
   login.addEventListener("submit", (event) => {
     event.preventDefault();
     const data = new FormData(login);
@@ -316,6 +388,8 @@
   });
 
   refreshButton.addEventListener("click", loadDashboard);
+  if (exportButton) exportButton.addEventListener("click", downloadCsv);
+  if (printButton) printButton.addEventListener("click", () => window.print());
   campForm.addEventListener("submit", saveCamp);
   if (cancelEditButton) cancelEditButton.addEventListener("click", resetCampForm);
 

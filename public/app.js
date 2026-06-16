@@ -7,6 +7,12 @@
   const successState = document.querySelector("#success-state");
   const calendarRoot = document.querySelector("#camp-calendar");
   const selectedCampPanel = document.querySelector("#selected-camp");
+  const childrenList = document.querySelector("#children-list");
+  const addChildButton = document.querySelector("#add-child");
+  const childRowTemplate = document.querySelector("#child-row-template");
+  const contactInfo = document.querySelector("#contact-info");
+  const faqContact = document.querySelector("#faq-contact");
+  const MAX_CHILDREN = 8;
   const SUMMER_MONTHS = ["2026-06", "2026-07", "2026-08"];
 
   let camps = [];
@@ -31,19 +37,70 @@
     statusPanel.dataset.ready = ready ? "true" : "false";
   }
 
+  function childrenPayload() {
+    if (!childrenList) return [];
+    return Array.from(childrenList.querySelectorAll("[data-child-row]")).map((row) => ({
+      camperName: row.querySelector('[name="camperName"]')?.value || "",
+      camperAge: row.querySelector('[name="camperAge"]')?.value || "",
+    }));
+  }
+
   function formPayload(formElement) {
     const data = new FormData(formElement);
     return {
       campId: data.get("campId"),
-      camperName: data.get("camperName"),
-      camperAge: data.get("camperAge"),
+      children: childrenPayload(),
       parentName: data.get("parentName"),
       parentEmail: data.get("parentEmail"),
       parentPhone: data.get("parentPhone"),
+      emergencyName: data.get("emergencyName"),
+      emergencyPhone: data.get("emergencyPhone"),
+      medicalNotes: data.get("medicalNotes"),
       goals: data.get("goals"),
       waiverAccepted: data.get("waiverAccepted") === "on",
       website: data.get("website"),
     };
+  }
+
+  function renumberChildren() {
+    if (!childrenList) return;
+    const rows = Array.from(childrenList.querySelectorAll("[data-child-row]"));
+    rows.forEach((row, index) => {
+      const title = row.querySelector(".child-row-title");
+      if (title) title.textContent = `Player ${index + 1}`;
+      const remove = row.querySelector("[data-remove-child]");
+      if (remove) remove.hidden = rows.length === 1;
+    });
+    if (addChildButton) addChildButton.disabled = rows.length >= MAX_CHILDREN;
+  }
+
+  function addChildRow() {
+    if (!childrenList || !childRowTemplate) return;
+    if (childrenList.querySelectorAll("[data-child-row]").length >= MAX_CHILDREN) return;
+    const row = childRowTemplate.content.cloneNode(true).querySelector("[data-child-row]");
+    const remove = row.querySelector("[data-remove-child]");
+    if (remove) {
+      remove.addEventListener("click", () => {
+        row.remove();
+        renumberChildren();
+      });
+    }
+    childrenList.appendChild(row);
+    renumberChildren();
+  }
+
+  function applyContact(config) {
+    const email = config && config.contactEmail ? config.contactEmail : "";
+    const phone = config && config.contactPhone ? config.contactPhone : "";
+    const parts = [];
+    if (email) parts.push(`<a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>`);
+    if (phone) parts.push(`<a href="tel:${escapeHtml(phone.replace(/[^\d+]/g, ""))}">${escapeHtml(phone)}</a>`);
+    if (contactInfo) contactInfo.innerHTML = parts.join(" · ");
+    if (faqContact) {
+      faqContact.innerHTML = parts.length
+        ? `Reach Noah at ${parts.join(" or ")}.`
+        : "Contact details will appear here once Noah adds them.";
+    }
   }
 
   function friendlyValidationErrors(details) {
@@ -264,6 +321,7 @@
       `<span>${escapeHtml(campDateRange(camp))} · ${escapeHtml(camp.startTime)} to ${escapeHtml(camp.endTime)}</span>`,
       `<span>${escapeHtml(camp.location)} · ages ${escapeHtml(camp.ageMin)} to ${escapeHtml(camp.ageMax)}</span>`,
       `<span>${escapeHtml(campStatusText(camp))}${camp.displayPrice ? ` · ${escapeHtml(camp.displayPrice)}` : ""}</span>`,
+      camp.notes ? `<span class="selected-camp-notes">${escapeHtml(camp.notes)}</span>` : "",
     ].join("");
 
     if (!camp.checkoutEnabled) {
@@ -293,7 +351,8 @@
       if (!configResponse.ok) throw new Error("Config endpoint is unavailable.");
       if (!campsResponse.ok) throw new Error("Camp calendar endpoint is unavailable.");
 
-      await configResponse.json();
+      const config = await configResponse.json();
+      applyContact(config);
       const campBody = await campsResponse.json();
       camps = (campBody.camps || []).sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)));
       renderCalendar();
@@ -349,6 +408,29 @@
     }
   }
 
+  function playersHeadline(status) {
+    const names = status.camperNames || [];
+    if (names.length > 1) return `${names.length} players are signed up!`;
+    if (names.length === 1) return `${names[0]} is signed up!`;
+    return "You are signed up!";
+  }
+
+  function successDetails(status) {
+    const rows = [];
+    if (status.campTitle) rows.push(`<li><strong>Camp:</strong> ${escapeHtml(status.campTitle)}</li>`);
+    if (status.campStartDate) rows.push(`<li><strong>Dates:</strong> ${escapeHtml(campDateRange(status))}</li>`);
+    if (status.campStartTime) {
+      rows.push(`<li><strong>Time:</strong> ${escapeHtml(status.campStartTime)} to ${escapeHtml(status.campEndTime || "")}</li>`);
+    }
+    if (status.campLocation) rows.push(`<li><strong>Location:</strong> ${escapeHtml(status.campLocation)}</li>`);
+    if (status.campNotes) rows.push(`<li><strong>What to bring:</strong> ${escapeHtml(status.campNotes)}</li>`);
+    if ((status.camperNames || []).length > 1) {
+      rows.push(`<li><strong>Players:</strong> ${escapeHtml(status.camperNames.join(", "))}</li>`);
+    }
+    if (!rows.length) return "";
+    return `<ul class="success-details">${rows.join("")}</ul>`;
+  }
+
   async function loadSuccessState() {
     if (!successState) return;
     const params = new URLSearchParams(window.location.search);
@@ -368,13 +450,13 @@
         headers: { accept: "application/json" },
       });
       const status = await response.json();
-      const campText = status.campTitle ? `${status.campTitle} · ${campDateRange(status)}` : status.serviceName;
 
       if (response.ok && status.status === "paid") {
         successState.innerHTML = [
           '<p class="section-kicker">Payment confirmed</p>',
-          "<h1>You are signed up.</h1>",
-          `<p class="muted">Stripe confirmed payment for ${escapeHtml(campText)}. Noah can see the registration in his coach view.</p>`,
+          `<h1>${escapeHtml(playersHeadline(status))}</h1>`,
+          '<p class="muted">Stripe confirmed your payment. A confirmation email is on its way, and Noah can see the registration in his coach view.</p>',
+          successDetails(status),
         ].join("");
         return;
       }
@@ -383,6 +465,7 @@
         '<p class="section-kicker">Payment received by Stripe</p>',
         "<h1>Waiting for roster confirmation.</h1>",
         '<p class="muted">The success redirect returned, but the server has not seen the Stripe webhook yet. Refresh in a moment.</p>',
+        successDetails(status),
       ].join("");
     } catch (error) {
       successState.innerHTML = [
@@ -394,6 +477,8 @@
   }
 
   if (form) {
+    if (addChildButton) addChildButton.addEventListener("click", addChildRow);
+    addChildRow();
     form.addEventListener("submit", submitSignup);
     loadAll();
   }

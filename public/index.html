@@ -91,16 +91,8 @@
         <input class="hidden-field" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
         <input type="hidden" name="campId" id="camp-id">
 
-        <div class="form-grid two">
-          <label>
-            <span>Child's name</span>
-            <input name="camperName" autocomplete="off" required>
-          </label>
-          <label>
-            <span>Child's age</span>
-            <input name="camperAge" inputmode="numeric" required>
-          </label>
-        </div>
+        <div id="children-list" class="children-list"></div>
+        <button type="button" id="add-child" class="button secondary compact add-child">+ Add another child</button>
 
         <div class="form-grid two">
           <label>
@@ -118,13 +110,24 @@
           <input name="parentPhone" inputmode="tel" autocomplete="tel" required>
         </label>
 
+        <div class="form-grid two">
+          <label>
+            <span>Emergency contact name</span>
+            <input name="emergencyName" autocomplete="off" required>
+          </label>
+          <label>
+            <span>Emergency contact phone</span>
+            <input name="emergencyPhone" inputmode="tel" autocomplete="off" required>
+          </label>
+        </div>
+
         <label>
-          <span>Preferred days or weeks</span>
-          <textarea name="preferredSchedule" rows="3" placeholder="Example: weekday mornings in June, or Tuesdays after 5" required></textarea>
+          <span>Allergies or medical notes</span>
+          <textarea name="medicalNotes" rows="2" placeholder="Allergies, asthma, or anything Noah should know in an emergency. If more than one child, note who. Leave blank if none."></textarea>
         </label>
 
         <label>
-          <span>What should Noah help with?</span>
+          <span>What should Noah help with? <em class="optional">(optional)</em></span>
           <textarea name="goals" rows="3" placeholder="Example: first touch, shooting, dribbling, confidence, tryout prep"></textarea>
         </label>
 
@@ -137,10 +140,63 @@
         <button id="submit-button" class="button primary full" type="submit" disabled>Pick a camp to continue</button>
       </form>
     </section>
+
+    <section id="faq" class="section faq-section" aria-label="Frequently asked questions">
+      <p class="section-kicker">Good to know</p>
+      <h2>Questions parents ask</h2>
+      <div class="faq-grid">
+        <div class="faq-item">
+          <h3>What ages can join?</h3>
+          <p>Each camp lists its own age range on the calendar. Most summer sessions are for ages 5 to 12, but check the camp you pick.</p>
+        </div>
+        <div class="faq-item">
+          <h3>What should my child bring?</h3>
+          <p>Water, cleats, and shin guards, plus a ball if you have one. Any extra notes for a specific camp show up when you select it and on your confirmation.</p>
+        </div>
+        <div class="faq-item">
+          <h3>How do payments work?</h3>
+          <p>Payment is handled securely by Stripe Checkout. Your spot is confirmed once Stripe completes the payment, and you'll get a confirmation by email.</p>
+        </div>
+        <div class="faq-item">
+          <h3>Can I sign up more than one child?</h3>
+          <p>Yes. Use "Add another child" on the signup form to register siblings together in one checkout.</p>
+        </div>
+        <div class="faq-item">
+          <h3>What about cancellations or weather?</h3>
+          <p>If a session is rained out or you need to reschedule, reach out to Noah directly and we'll sort it out.</p>
+        </div>
+        <div class="faq-item">
+          <h3>Still have a question?</h3>
+          <p id="faq-contact" class="muted">Contact details are below in the footer.</p>
+        </div>
+      </div>
+    </section>
   </main>
 
+  <template id="child-row-template">
+    <div class="child-row" data-child-row>
+      <div class="child-row-head">
+        <span class="child-row-title">Player 1</span>
+        <button type="button" class="link-button" data-remove-child hidden>Remove</button>
+      </div>
+      <div class="form-grid two">
+        <label>
+          <span>Child's name</span>
+          <input name="camperName" autocomplete="off" required>
+        </label>
+        <label>
+          <span>Child's age</span>
+          <input name="camperAge" inputmode="numeric" required>
+        </label>
+      </div>
+    </div>
+  </template>
+
   <footer class="footer">
-    <span>Noah Westra Soccer Training</span>
+    <div class="footer-main">
+      <span>Noah Westra Soccer Training</span>
+      <span id="contact-info" class="contact-info"></span>
+    </div>
     <a href="/admin.html">Coach view</a>
   </footer>
 

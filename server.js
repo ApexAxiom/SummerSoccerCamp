@@ -15,6 +15,14 @@ loadEnvFile(path.join(ROOT, ".env"));
 const PORT = Number(process.env.PORT || 4242);
 const APP_URL = process.env.APP_URL || `http://localhost:${PORT}`;
 
+const CONTACT_EMAIL = process.env.CONTACT_EMAIL || "";
+const CONTACT_PHONE = process.env.CONTACT_PHONE || "";
+const COACH_EMAIL = process.env.COACH_EMAIL || CONTACT_EMAIL;
+const MAIL_FROM = process.env.MAIL_FROM || "";
+const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+
+const MAX_CHILDREN_PER_SIGNUP = 8;
+
 const SERVICES = [
   {
     id: "group",
@@ -112,6 +120,8 @@ function publicConfig() {
     services: SERVICES.map(serviceConfig),
     webhookConfigured: Boolean(process.env.STRIPE_WEBHOOK_SECRET),
     adminConfigured: Boolean(process.env.ADMIN_TOKEN),
+    contactEmail: CONTACT_EMAIL,
+    contactPhone: CONTACT_PHONE,
   };
 }
 
@@ -296,6 +306,132 @@ function createCampId() {
   return `camp_${Date.now().toString(36)}_${crypto.randomBytes(5).toString("hex")}`;
 }
 
+function createGroupId() {
+  return `grp_${Date.now().toString(36)}_${crypto.randomBytes(5).toString("hex")}`;
+}
+
+// Serialize read-modify-write on the registrations file so two parents racing
+// for the last spot in the same camp cannot both pass the capacity check.
+let registrationsChain = Promise.resolve();
+function withRegistrationsLock(task) {
+  const run = registrationsChain.then(() => task());
+  registrationsChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+function formatCampDates(startDate, endDate) {
+  const options = { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" };
+  const start = new Date(`${startDate}T00:00:00Z`).toLocaleDateString("en-US", options);
+  if (!endDate || endDate === startDate) return start;
+  const end = new Date(`${endDate}T00:00:00Z`).toLocaleDateString("en-US", options);
+  return `${start} – ${end}`;
+}
+
+// Sends mail through Resend's HTTP API when configured, and otherwise logs the
+// message and returns without throwing. This mirrors how the rest of the app
+// degrades gracefully when an integration is not set up yet, so a missing email
+// key never blocks a real payment from being recorded.
+async function sendEmail({ to, subject, text, html }) {
+  const recipients = (Array.isArray(to) ? to : [to]).filter(Boolean);
+  if (!recipients.length) return { sent: false, reason: "no_recipient" };
+
+  if (!RESEND_API_KEY || !MAIL_FROM) {
+    console.log(`[email skipped] to=${recipients.join(", ")} subject="${subject}" (set RESEND_API_KEY and MAIL_FROM to send)`);
+    return { sent: false, reason: "not_configured" };
+  }
+
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${RESEND_API_KEY}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ from: MAIL_FROM, to: recipients, subject, text, html }),
+    });
+    if (!response.ok) {
+      const body = await response.text();
+      console.error(`[email failed] ${response.status} ${body}`);
+      return { sent: false, reason: "api_error" };
+    }
+    return { sent: true };
+  } catch (error) {
+    console.error(`[email error] ${error.message}`);
+    return { sent: false, reason: "exception" };
+  }
+}
+
+function campSummaryLines(registration) {
+  const lines = [
+    `Camp: ${registration.campTitle}`,
+    `Dates: ${formatCampDates(registration.campStartDate, registration.campEndDate)}`,
+  ];
+  if (registration.campStartTime || registration.campEndTime) {
+    lines.push(`Time: ${registration.campStartTime} to ${registration.campEndTime}`);
+  }
+  if (registration.campLocation) lines.push(`Location: ${registration.campLocation}`);
+  if (registration.campNotes) lines.push(`What to bring / notes: ${registration.campNotes}`);
+  return lines;
+}
+
+async function sendSignupEmails(groupRegistrations) {
+  if (!groupRegistrations.length) return;
+  const first = groupRegistrations[0];
+  const camperNames = groupRegistrations.map((item) => item.camperName);
+  const summary = campSummaryLines(first);
+
+  const parentText = [
+    `Hi ${first.parentName},`,
+    "",
+    `You're signed up${camperNames.length > 1 ? ` for ${camperNames.length} players` : ""}: ${camperNames.join(", ")}.`,
+    "",
+    ...summary,
+    "",
+    CONTACT_EMAIL || CONTACT_PHONE ? `Questions? Reach Noah at ${[CONTACT_EMAIL, CONTACT_PHONE].filter(Boolean).join(" or ")}.` : "",
+    "See you on the field!",
+  ].filter((line) => line !== null).join("\n");
+
+  await sendEmail({
+    to: first.parentEmail,
+    subject: `You're signed up: ${first.campTitle}`,
+    text: parentText,
+    html: `<p>Hi ${escapeForEmail(first.parentName)},</p>`
+      + `<p>You're signed up${camperNames.length > 1 ? ` for ${camperNames.length} players` : ""}: <strong>${escapeForEmail(camperNames.join(", "))}</strong>.</p>`
+      + `<ul>${summary.map((line) => `<li>${escapeForEmail(line)}</li>`).join("")}</ul>`
+      + (CONTACT_EMAIL || CONTACT_PHONE ? `<p>Questions? Reach Noah at ${escapeForEmail([CONTACT_EMAIL, CONTACT_PHONE].filter(Boolean).join(" or "))}.</p>` : "")
+      + "<p>See you on the field!</p>",
+  });
+
+  if (COACH_EMAIL) {
+    const coachText = [
+      `New paid signup for ${first.campTitle} (${formatCampDates(first.campStartDate, first.campEndDate)}).`,
+      "",
+      `Players: ${camperNames.join(", ")}`,
+      `Parent: ${first.parentName} — ${first.parentEmail} — ${first.parentPhone}`,
+      first.emergencyName ? `Emergency contact: ${first.emergencyName} — ${first.emergencyPhone}` : "",
+      first.medicalNotes ? `Allergies / medical: ${first.medicalNotes}` : "",
+      first.goals ? `Goals: ${first.goals}` : "",
+    ].filter(Boolean).join("\n");
+
+    await sendEmail({
+      to: COACH_EMAIL,
+      subject: `New signup: ${camperNames.join(", ")} — ${first.campTitle}`,
+      text: coachText,
+      html: coachText.split("\n").map((line) => `<p>${escapeForEmail(line)}</p>`).join(""),
+    });
+  }
+}
+
+function escapeForEmail(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 function countCampRegistrations(campId, registrations) {
   const campRegistrations = registrations.filter((item) => item.campId === campId);
   return {
@@ -426,10 +562,20 @@ function validateCamp(input, existingCamp = null) {
   };
 }
 
+function normalizeChildren(input) {
+  if (Array.isArray(input.children) && input.children.length) {
+    return input.children.slice(0, MAX_CHILDREN_PER_SIGNUP);
+  }
+  // Accept a single camper too, so older clients keep working.
+  return [{ camperName: input.camperName, camperAge: input.camperAge }];
+}
+
 function validateSignup(input, camp, registrations) {
   const errors = {};
   const service = serviceFor(camp.trainingType);
   const counts = countCampRegistrations(camp.id, registrations);
+  const rawChildren = normalizeChildren(input);
+  const spotsLeft = Math.max(Number(camp.capacity) - counts.active, 0);
 
   if (text(input.website)) {
     errors.form = "Signup could not be accepted.";
@@ -443,19 +589,23 @@ function validateSignup(input, camp, registrations) {
     errors.campId = "This camp is not open for signup.";
   }
 
-  if (counts.active >= Number(camp.capacity)) {
-    errors.campId = "This camp is full.";
+  if (rawChildren.length > spotsLeft) {
+    errors.campId = spotsLeft <= 0
+      ? "This camp is full."
+      : `Only ${spotsLeft} spot${spotsLeft === 1 ? "" : "s"} left in this camp.`;
   }
 
-  const camperName = text(input.camperName, 120);
-  if (camperName.length < 2) {
-    errors.camperName = "Enter the camper's name.";
-  }
-
-  const camperAge = Number(input.camperAge);
-  if (!Number.isInteger(camperAge) || camperAge < camp.ageMin || camperAge > camp.ageMax) {
-    errors.camperAge = `Enter an age from ${camp.ageMin} to ${camp.ageMax}.`;
-  }
+  const children = rawChildren.map((child, index) => {
+    const camperName = text(child.camperName, 120);
+    const camperAge = Number(child.camperAge);
+    if (camperName.length < 2) {
+      errors[`child_${index}_name`] = `Enter a name for child ${index + 1}.`;
+    }
+    if (!Number.isInteger(camperAge) || camperAge < camp.ageMin || camperAge > camp.ageMax) {
+      errors[`child_${index}_age`] = `Enter an age from ${camp.ageMin} to ${camp.ageMax} for child ${index + 1}.`;
+    }
+    return { camperName, camperAge, goals: text(child.goals, 800) };
+  });
 
   const parentName = text(input.parentName, 120);
   if (parentName.length < 2) {
@@ -472,6 +622,16 @@ function validateSignup(input, camp, registrations) {
     errors.parentPhone = "Enter a valid phone number.";
   }
 
+  const emergencyName = text(input.emergencyName, 120);
+  if (emergencyName.length < 2) {
+    errors.emergencyName = "Enter an emergency contact name.";
+  }
+
+  const emergencyPhone = text(input.emergencyPhone, 40);
+  if (emergencyPhone.replace(/\D/g, "").length < 10) {
+    errors.emergencyPhone = "Enter a valid emergency contact phone number.";
+  }
+
   if (input.waiverAccepted !== true) {
     errors.waiverAccepted = "A parent or guardian must accept the activity waiver.";
   }
@@ -483,42 +643,57 @@ function validateSignup(input, camp, registrations) {
     throw error;
   }
 
+  const sharedGoals = text(input.goals, 800);
+  const medicalNotes = text(input.medicalNotes, 800);
+  const shared = {
+    campId: camp.id,
+    campTitle: camp.title,
+    campStartDate: camp.startDate,
+    campEndDate: camp.endDate,
+    campStartTime: camp.startTime,
+    campEndTime: camp.endTime,
+    campLocation: camp.location,
+    campNotes: camp.notes || "",
+    trainingType: service.id,
+    parentName,
+    parentEmail,
+    parentPhone,
+    emergencyName,
+    emergencyPhone,
+    medicalNotes,
+    waiverAccepted: true,
+  };
+
   return {
     service,
-    signup: {
-      campId: camp.id,
-      campTitle: camp.title,
-      campStartDate: camp.startDate,
-      campEndDate: camp.endDate,
-      trainingType: service.id,
-      camperName,
-      camperAge,
-      parentName,
-      parentEmail,
-      parentPhone,
-      goals: text(input.goals, 800),
-      waiverAccepted: true,
-    },
+    shared,
+    children: children.map((child) => ({
+      ...shared,
+      camperName: child.camperName,
+      camperAge: child.camperAge,
+      goals: child.goals || sharedGoals,
+    })),
   };
 }
 
-async function createStripeCheckoutSession(registration, service, camp) {
+async function createStripeCheckoutSession(group, service, camp) {
   const priceId = requireStripeConfig(service);
+  const quantity = String(group.registrations.length);
 
   const params = new URLSearchParams();
   params.set("mode", "payment");
   params.set("line_items[0][price]", priceId);
-  params.set("line_items[0][quantity]", "1");
-  params.set("client_reference_id", registration.id);
-  params.set("customer_email", registration.parentEmail);
+  params.set("line_items[0][quantity]", quantity);
+  params.set("client_reference_id", group.id);
+  params.set("customer_email", group.parentEmail);
   params.set("success_url", `${APP_URL}/success.html?session_id={CHECKOUT_SESSION_ID}`);
   params.set("cancel_url", `${APP_URL}/#calendar`);
-  params.set("metadata[registration_id]", registration.id);
+  params.set("metadata[group_id]", group.id);
   params.set("metadata[camp_id]", camp.id);
-  params.set("metadata[training_type]", registration.trainingType);
-  params.set("payment_intent_data[metadata][registration_id]", registration.id);
+  params.set("metadata[training_type]", service.id);
+  params.set("payment_intent_data[metadata][group_id]", group.id);
   params.set("payment_intent_data[metadata][camp_id]", camp.id);
-  params.set("payment_intent_data[metadata][training_type]", registration.trainingType);
+  params.set("payment_intent_data[metadata][training_type]", service.id);
 
   const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
     method: "POST",
@@ -566,7 +741,7 @@ function requireStripeConfig(service) {
 
 async function handleCreateCheckoutSession(req, res) {
   const input = await readJson(req);
-  const [camps, registrations] = await Promise.all([readCamps(), readRegistrations()]);
+  const camps = await readCamps();
   const camp = camps.find((item) => item.id === input.campId);
 
   if (!camp) {
@@ -576,37 +751,56 @@ async function handleCreateCheckoutSession(req, res) {
     throw error;
   }
 
-  const { service, signup } = validateSignup(input, camp, registrations);
+  // Validate Stripe config before reserving spots, so a misconfigured camp
+  // never creates pending registrations it cannot collect payment for.
+  const service = serviceFor(camp.trainingType);
+  if (!service) {
+    const error = new Error("This camp is missing a payment setup type.");
+    error.statusCode = 400;
+    throw error;
+  }
   requireStripeConfig(service);
 
-  const now = new Date().toISOString();
-  const registration = {
-    id: createRegistrationId(),
-    status: "pending_checkout",
-    createdAt: now,
-    updatedAt: now,
-    waiverAcceptedAt: now,
-    ...signup,
-  };
+  // Reserve every child's spot in one locked read-modify-write so concurrent
+  // checkouts cannot oversell the camp.
+  const group = await withRegistrationsLock(async () => {
+    const registrations = await readRegistrations();
+    const { children } = validateSignup(input, camp, registrations);
 
-  await upsertRegistration(registration);
+    const now = new Date().toISOString();
+    const groupId = createGroupId();
+    const reserved = children.map((child) => ({
+      id: createRegistrationId(),
+      groupId,
+      status: "pending_checkout",
+      createdAt: now,
+      updatedAt: now,
+      waiverAcceptedAt: now,
+      ...child,
+    }));
+
+    await writeRegistrations([...registrations, ...reserved]);
+    return { id: groupId, parentEmail: reserved[0].parentEmail, registrations: reserved };
+  });
 
   try {
-    const session = await createStripeCheckoutSession(registration, service, camp);
-    await upsertRegistration({
-      ...registration,
-      status: "checkout_started",
-      updatedAt: new Date().toISOString(),
-      stripeCheckoutSessionId: session.id,
+    const session = await createStripeCheckoutSession(group, service, camp);
+    await withRegistrationsLock(async () => {
+      const registrations = await readRegistrations();
+      const updated = registrations.map((item) => (item.groupId === group.id
+        ? { ...item, status: "checkout_started", updatedAt: new Date().toISOString(), stripeCheckoutSessionId: session.id }
+        : item));
+      await writeRegistrations(updated);
     });
 
     sendJson(res, 200, { url: session.url });
   } catch (error) {
-    await upsertRegistration({
-      ...registration,
-      status: "checkout_failed",
-      updatedAt: new Date().toISOString(),
-      checkoutError: error.message,
+    await withRegistrationsLock(async () => {
+      const registrations = await readRegistrations();
+      const updated = registrations.map((item) => (item.groupId === group.id
+        ? { ...item, status: "checkout_failed", updatedAt: new Date().toISOString(), checkoutError: error.message }
+        : item));
+      await writeRegistrations(updated);
     });
     throw error;
   }
@@ -689,45 +883,60 @@ async function handleStripeWebhook(req, res) {
   sendJson(res, 200, { received: true });
 }
 
+function sessionGroupId(session) {
+  return session.client_reference_id || session.metadata?.group_id || null;
+}
+
 async function markCheckoutPaid(session) {
-  const registrationId = session.client_reference_id || session.metadata?.registration_id;
-  if (!registrationId) return;
+  const groupId = sessionGroupId(session);
+  if (!groupId) return;
 
-  const registrations = await readRegistrations();
-  const index = registrations.findIndex((item) => item.id === registrationId);
-  if (index < 0) return;
+  // Split the total Stripe charged evenly across the children in the group so
+  // each roster row shows a per-child amount.
+  const paid = await withRegistrationsLock(async () => {
+    const registrations = await readRegistrations();
+    const groupRows = registrations.filter((item) => item.groupId === groupId);
+    if (!groupRows.length) return [];
 
-  registrations[index] = {
-    ...registrations[index],
-    status: "paid",
-    updatedAt: new Date().toISOString(),
-    paidAt: new Date().toISOString(),
-    stripeCheckoutSessionId: session.id,
-    stripePaymentIntentId: session.payment_intent || registrations[index].stripePaymentIntentId || null,
-    stripeCustomerId: session.customer || null,
-    amountTotal: session.amount_total ?? null,
-    currency: session.currency || null,
-  };
+    const now = new Date().toISOString();
+    const perChild = typeof session.amount_total === "number"
+      ? Math.round(session.amount_total / groupRows.length)
+      : null;
 
-  await writeRegistrations(registrations);
+    const updated = registrations.map((item) => (item.groupId === groupId
+      ? {
+        ...item,
+        status: "paid",
+        updatedAt: now,
+        paidAt: now,
+        stripeCheckoutSessionId: session.id,
+        stripePaymentIntentId: session.payment_intent || item.stripePaymentIntentId || null,
+        stripeCustomerId: session.customer || null,
+        amountTotal: perChild,
+        currency: session.currency || null,
+      }
+      : item));
+
+    await writeRegistrations(updated);
+    return updated.filter((item) => item.groupId === groupId);
+  });
+
+  if (paid.length) {
+    await sendSignupEmails(paid);
+  }
 }
 
 async function markCheckoutExpired(session) {
-  const registrationId = session.client_reference_id || session.metadata?.registration_id;
-  if (!registrationId) return;
+  const groupId = sessionGroupId(session);
+  if (!groupId) return;
 
-  const registrations = await readRegistrations();
-  const index = registrations.findIndex((item) => item.id === registrationId);
-  if (index < 0 || registrations[index].status === "paid") return;
-
-  registrations[index] = {
-    ...registrations[index],
-    status: "expired",
-    updatedAt: new Date().toISOString(),
-    stripeCheckoutSessionId: session.id,
-  };
-
-  await writeRegistrations(registrations);
+  await withRegistrationsLock(async () => {
+    const registrations = await readRegistrations();
+    const updated = registrations.map((item) => (item.groupId === groupId && item.status !== "paid"
+      ? { ...item, status: "expired", updatedAt: new Date().toISOString(), stripeCheckoutSessionId: session.id }
+      : item));
+    await writeRegistrations(updated);
+  });
 }
 
 async function handleSessionStatus(url, res) {
@@ -738,20 +947,28 @@ async function handleSessionStatus(url, res) {
   }
 
   const registrations = await readRegistrations();
-  const registration = registrations.find((item) => item.stripeCheckoutSessionId === sessionId);
-  if (!registration) {
+  const group = registrations.filter((item) => item.stripeCheckoutSessionId === sessionId);
+  if (!group.length) {
     sendJson(res, 404, { status: "unknown" });
     return;
   }
 
+  const registration = group[0];
   const service = serviceFor(registration.trainingType);
+  const allPaid = group.every((item) => item.status === "paid");
   sendJson(res, 200, {
-    status: registration.status,
+    status: allPaid ? "paid" : registration.status,
     trainingType: registration.trainingType,
     serviceName: service?.name || registration.trainingType,
     campTitle: registration.campTitle || null,
     campStartDate: registration.campStartDate || null,
     campEndDate: registration.campEndDate || null,
+    campStartTime: registration.campStartTime || null,
+    campEndTime: registration.campEndTime || null,
+    campLocation: registration.campLocation || null,
+    campNotes: registration.campNotes || null,
+    camperNames: group.map((item) => item.camperName),
+    childCount: group.length,
     paidAt: registration.paidAt || null,
     amountTotal: registration.amountTotal ?? null,
     currency: registration.currency || null,
