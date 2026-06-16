@@ -5,6 +5,7 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js && node --check public/app.js && node --check public/admin.js"
+    "check": "node --check server.js && node --check public/app.js && node --check public/admin.js && node --check shared/core.js && node --check shared/stripe.js && node --check shared/email.js",
+    "test": "node test/logic.test.js"
   }
 }
