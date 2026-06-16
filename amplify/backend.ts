@@ -46,9 +46,11 @@ for (const fn of [apiLambda, webhookLambda]) {
 }
 
 // ---------------------------------------------------------------------------
-// Shared, non-secret configuration. Edit APP_URL and the optional integration
-// values below before deploying. (RESEND_API_KEY is here for convenience; move it
-// to a secret() in the resource files once you start sending email.)
+// Configuration. Everything except the table wiring is read from Amplify build
+// environment variables at deploy time (Amplify console -> App settings ->
+// Environment variables), so no real keys ever live in this repo. Unset values
+// fall back to blank and the app degrades gracefully: empty Stripe keys ->
+// checkout shows "Stripe setup needed"; empty ADMIN_TOKEN -> coach view 503.
 // ---------------------------------------------------------------------------
 const sharedEnv: Record<string, string> = {
   CAMPS_TABLE: campsTable.tableName,
@@ -57,27 +59,24 @@ const sharedEnv: Record<string, string> = {
   REGISTRATIONS_BY_GROUP_INDEX: "byGroup",
   REGISTRATIONS_BY_SESSION_INDEX: "bySession",
 
-  // The public site origin, used to build Stripe success/cancel URLs.
-  APP_URL: "https://noahscompany.com",
+  // Public site origin, used to build Stripe success/cancel URLs.
+  APP_URL: process.env.APP_URL || "https://www.noahscompany.com",
 
-  // Blank by default so the backend deploys with no setup. The app degrades
-  // gracefully: empty Stripe keys -> checkout shows "Stripe setup needed"; empty
-  // ADMIN_TOKEN -> coach view returns 503. Fill these in (and ideally move
-  // STRIPE_SECRET_KEY / ADMIN_TOKEN to Amplify secrets) to go live.
-  STRIPE_SECRET_KEY: "",
-  STRIPE_WEBHOOK_SECRET: "",
-  STRIPE_GROUP_PRICE_ID: "",
-  ADMIN_TOKEN: "",
+  // Set these as Amplify environment variables to go live (test values first).
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || "",
+  STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || "",
+  STRIPE_GROUP_PRICE_ID: process.env.STRIPE_GROUP_PRICE_ID || "",
+  ADMIN_TOKEN: process.env.ADMIN_TOKEN || "",
 
-  // Optional — leave blank until you use them.
-  STRIPE_PRIVATE_PRICE_ID: "",
-  CONTACT_EMAIL: "",
-  CONTACT_PHONE: "",
-  COACH_EMAIL: "",
-  RESEND_API_KEY: "",
-  MAIL_FROM: "",
-  GROUP_DISPLAY_PRICE: "",
-  PRIVATE_DISPLAY_PRICE: "",
+  // Optional integrations — set when you use them.
+  STRIPE_PRIVATE_PRICE_ID: process.env.STRIPE_PRIVATE_PRICE_ID || "",
+  CONTACT_EMAIL: process.env.CONTACT_EMAIL || "",
+  CONTACT_PHONE: process.env.CONTACT_PHONE || "",
+  COACH_EMAIL: process.env.COACH_EMAIL || "",
+  RESEND_API_KEY: process.env.RESEND_API_KEY || "",
+  MAIL_FROM: process.env.MAIL_FROM || "",
+  GROUP_DISPLAY_PRICE: process.env.GROUP_DISPLAY_PRICE || "",
+  PRIVATE_DISPLAY_PRICE: process.env.PRIVATE_DISPLAY_PRICE || "",
 };
 
 for (const fn of [apiLambda, webhookLambda]) {
