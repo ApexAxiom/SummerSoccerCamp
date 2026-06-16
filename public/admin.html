@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Coach View | Noah Soccer Training</title>
+  <link rel="stylesheet" href="/styles.css?v=20260615h">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true">NW</span>
+      <span>Noah Soccer Training</span>
+    </a>
+    <nav class="nav" aria-label="Primary navigation">
+      <a href="/">Public site</a>
+    </nav>
+  </header>
+
+  <main class="section admin-shell">
+    <div class="admin-head">
+      <div>
+        <p class="section-kicker">Coach view</p>
+        <h1>Camp schedule</h1>
+      </div>
+      <button id="refresh-button" class="button secondary compact" type="button">Refresh</button>
+    </div>
+
+    <form id="admin-login" class="admin-login">
+      <label>
+        <span>Admin token</span>
+        <input name="token" type="password" autocomplete="off" required>
+      </label>
+      <button class="button primary full" type="submit">View registrations</button>
+      <p class="muted small">Use the `ADMIN_TOKEN` from the server environment. It is never stored on the server by this page.</p>
+    </form>
+
+    <div id="admin-message" class="form-message" role="alert" hidden></div>
+
+    <div id="admin-content" class="admin-content" hidden>
+      <form id="camp-form" class="camp-form" novalidate>
+        <input type="hidden" name="campId">
+        <div class="form-section-head">
+          <div>
+            <h2 id="camp-form-title">Add a camp or day</h2>
+            <p id="camp-form-help" class="muted">Create real camp dates for parents to pick from. Use the same start and end date for a one-day session. Payment amount still comes from the Stripe Price ID.</p>
+          </div>
+        </div>
+
+        <div class="form-grid two">
+          <label>
+            <span>Camp title</span>
+            <input name="title" placeholder="June skills camp" required>
+          </label>
+          <label>
+            <span>Type</span>
+            <select name="trainingType" required>
+              <option value="group">Small group</option>
+              <option value="private">One-on-one</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="form-grid two">
+          <label>
+            <span>Start date</span>
+            <input name="startDate" type="date" required>
+          </label>
+          <label>
+            <span>End date</span>
+            <input name="endDate" type="date" required>
+          </label>
+        </div>
+
+        <div class="form-grid two">
+          <label>
+            <span>Start time</span>
+            <input name="startTime" placeholder="9:00 AM" required>
+          </label>
+          <label>
+            <span>End time</span>
+            <input name="endTime" placeholder="11:00 AM" required>
+          </label>
+        </div>
+
+        <div class="form-grid three">
+          <label>
+            <span>Youngest age</span>
+            <input name="ageMin" inputmode="numeric" value="5" required>
+          </label>
+          <label>
+            <span>Oldest age</span>
+            <input name="ageMax" inputmode="numeric" value="12" required>
+          </label>
+          <label>
+            <span>Spots</span>
+            <input name="capacity" inputmode="numeric" value="12" required>
+          </label>
+        </div>
+
+        <div class="form-grid three">
+          <label>
+            <span>Display price</span>
+            <input name="displayPrice" placeholder="$50">
+          </label>
+          <label>
+            <span>Calendar color</span>
+            <select name="color">
+              <option value="green">Green</option>
+              <option value="blue">Blue</option>
+              <option value="gold">Gold</option>
+              <option value="red">Red</option>
+              <option value="purple">Purple</option>
+              <option value="slate">Slate</option>
+            </select>
+          </label>
+          <label>
+            <span>Status</span>
+            <select name="status">
+              <option value="open">Open</option>
+              <option value="closed">Closed</option>
+              <option value="archived">Archived</option>
+            </select>
+          </label>
+        </div>
+
+        <label>
+          <span>Location</span>
+          <input name="location" placeholder="Cole's Crossing Soccer Field" required>
+        </label>
+
+        <label>
+          <span>Notes for parents</span>
+          <textarea name="notes" rows="3" placeholder="What to bring, focus for the week, weather notes"></textarea>
+        </label>
+
+        <div class="form-actions">
+          <button id="save-camp-button" class="button primary full" type="submit">Add camp/day</button>
+          <button id="cancel-edit-button" class="button secondary full" type="button" hidden>Cancel edit</button>
+        </div>
+      </form>
+
+      <div id="dashboard" class="camp-dashboard" aria-live="polite"></div>
+    </div>
+  </main>
+
+  <script src="/admin.js?v=20260615h"></script>
+</body>
+</html>

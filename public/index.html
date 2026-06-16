@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Summer soccer training with Noah Westra in Cypress, Texas. Parents can sign up for one-on-one or small group sessions and pay through Stripe Checkout.">
+  <title>Noah Westra Soccer Training</title>
+  <link rel="preload" href="/assets/noah-headshot.webp" as="image">
+  <link rel="stylesheet" href="/styles.css?v=20260615h">
+</head>
+<body>
+  <header class="topbar" aria-label="Site header">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true">NW</span>
+      <span>Noah Soccer Training</span>
+    </a>
+    <nav class="nav" aria-label="Primary navigation">
+      <a href="#about">Noah</a>
+      <a href="#calendar">Camps</a>
+      <a href="/admin.html">Coach view</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <picture>
+        <source srcset="/assets/noah-headshot.webp" type="image/webp">
+        <img class="hero-photo" src="/assets/noah-headshot.png" alt="Noah Westra in his soccer uniform">
+      </picture>
+      <div class="hero-wash" aria-hidden="true"></div>
+      <div class="hero-content">
+        <p class="eyebrow">Cypress summer soccer training</p>
+        <h1>Train with Noah Westra</h1>
+        <p class="hero-copy">One-on-one and small group sessions for young players who want more confidence, sharper footwork, and more touches this summer.</p>
+        <div class="hero-actions">
+          <a class="button primary" href="#calendar">Pick a camp</a>
+          <a class="button secondary" href="#about">Meet Noah</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="about" class="section intro-grid">
+      <div>
+        <p class="section-kicker">Meet the trainer</p>
+        <h2>Noah loves helping kids get better on the ball.</h2>
+      </div>
+      <div class="body-copy">
+        <p>Noah is 16 years old and has played soccer since he was three. He played Varsity this year for Cy Woods High School and currently plays for the Albion ENCL team.</p>
+        <p>This summer, Noah would love to teach your child one-on-one or in a small group. Sessions can focus on dribbling, first touch, shooting, confidence, or the specific skills your child wants to improve.</p>
+      </div>
+    </section>
+
+    <section class="section details-band" aria-label="Training details">
+      <div class="detail">
+        <span class="detail-label">Training style</span>
+        <strong>One-on-one or small group</strong>
+      </div>
+      <div class="detail">
+        <span class="detail-label">Best fit</span>
+        <strong>Young players building confidence</strong>
+      </div>
+      <div class="detail">
+        <span class="detail-label">Payment</span>
+        <strong>Secure Stripe Checkout</strong>
+      </div>
+    </section>
+
+    <section id="calendar" class="section calendar-section">
+      <div class="calendar-head">
+        <div>
+          <p class="section-kicker">Summer calendar</p>
+          <h2>Pick a camp, then sign up and pay.</h2>
+        </div>
+        <div id="backend-status" class="status-panel" role="status">Checking payment setup...</div>
+      </div>
+      <div id="camp-calendar" class="camp-calendar" aria-live="polite"></div>
+    </section>
+
+    <section id="signup" class="section signup-section">
+      <div class="signup-copy">
+        <p class="section-kicker">Parent signup</p>
+        <h2>Confirm the details for your child.</h2>
+        <p>Choose a camp above first. The server creates a Stripe Checkout session for that camp and only marks the roster paid after Stripe confirms it.</p>
+        <div id="selected-camp" class="selected-camp" role="status">
+          <strong>No camp selected yet.</strong>
+          <span>Pick an open camp from the calendar to enable signup.</span>
+        </div>
+      </div>
+
+      <form id="signup-form" class="signup-form" novalidate>
+        <input class="hidden-field" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <input type="hidden" name="campId" id="camp-id">
+
+        <div class="form-grid two">
+          <label>
+            <span>Child's name</span>
+            <input name="camperName" autocomplete="off" required>
+          </label>
+          <label>
+            <span>Child's age</span>
+            <input name="camperAge" inputmode="numeric" required>
+          </label>
+        </div>
+
+        <div class="form-grid two">
+          <label>
+            <span>Parent name</span>
+            <input name="parentName" autocomplete="name" required>
+          </label>
+          <label>
+            <span>Parent email</span>
+            <input name="parentEmail" type="email" autocomplete="email" required>
+          </label>
+        </div>
+
+        <label>
+          <span>Parent phone</span>
+          <input name="parentPhone" inputmode="tel" autocomplete="tel" required>
+        </label>
+
+        <label>
+          <span>Preferred days or weeks</span>
+          <textarea name="preferredSchedule" rows="3" placeholder="Example: weekday mornings in June, or Tuesdays after 5" required></textarea>
+        </label>
+
+        <label>
+          <span>What should Noah help with?</span>
+          <textarea name="goals" rows="3" placeholder="Example: first touch, shooting, dribbling, confidence, tryout prep"></textarea>
+        </label>
+
+        <label class="waiver">
+          <input type="checkbox" name="waiverAccepted" required>
+          <span>I am the parent or guardian, and I understand soccer training involves physical activity and normal risk.</span>
+        </label>
+
+        <div id="form-message" class="form-message" role="alert" hidden></div>
+        <button id="submit-button" class="button primary full" type="submit" disabled>Pick a camp to continue</button>
+      </form>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>Noah Westra Soccer Training</span>
+    <a href="/admin.html">Coach view</a>
+  </footer>
+
+  <script src="/app.js?v=20260615h"></script>
+</body>
+</html>
