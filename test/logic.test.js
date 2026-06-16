@@ -136,13 +136,14 @@ test("countCampRegistrations counts active, paid, pending correctly", () => {
   assert.strictEqual(counts.total, 4);
 });
 
-test("publicCamp computes spotsLeft and hides internal fields", () => {
-  const regs = [{ campId: "camp_1", status: "paid" }, { campId: "camp_1", status: "pending_checkout" }];
-  const view = core.publicCamp(sampleCamp, regs);
+test("publicCamp computes spotsLeft from counts and hides internal fields", () => {
+  const view = core.publicCamp(sampleCamp, { active: 2, paid: 1 });
   assert.strictEqual(view.capacity, 20);
   assert.strictEqual(view.spotsLeft, 18);
   assert.strictEqual(view.paidCount, 1);
+  assert.strictEqual(view.activeCount, 2);
   assert.strictEqual(view.notes, "Bring water and cleats.");
+  assert.strictEqual(view.stripeCustomerId, undefined, "no internal/registration fields leak");
 });
 
 test("validateCamp rejects an end date before the start date", () => {

@@ -175,7 +175,7 @@ async function handlePublicCamps(res) {
   const visible = camps
     .filter((camp) => camp.status !== "archived")
     .sort(sortByStartDate)
-    .map((camp) => publicCamp(camp, registrations));
+    .map((camp) => publicCamp(camp, countCampRegistrations(camp.id, registrations)));
 
   sendJson(res, 200, { camps: visible });
 }
@@ -471,6 +471,13 @@ async function handleRequest(req, res) {
 
   if (req.method === "GET" && url.pathname === "/health") {
     sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/amplify_outputs.json") {
+    // Local dev has no Amplify backend: report no custom config so the frontend
+    // falls back to these same-origin /api routes (and avoids a console 404).
+    sendJson(res, 200, {});
     return;
   }
 

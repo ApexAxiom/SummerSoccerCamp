@@ -205,12 +205,16 @@ function countCampRegistrations(campId, registrations) {
   };
 }
 
-function publicCamp(camp, registrations) {
+// counts is { active, paid }. The file server computes it from the registrations
+// array (countCampRegistrations); the Lambda passes a maintained DynamoDB counter
+// so it never has to read every registration just to render the calendar.
+function publicCamp(camp, counts = {}) {
   const service = serviceFor(camp.trainingType);
   const config = service ? serviceConfig(service) : null;
-  const counts = countCampRegistrations(camp.id, registrations);
+  const active = Number(counts.active || 0);
+  const paid = Number(counts.paid || 0);
   const capacity = Number(camp.capacity || 0);
-  const spotsLeft = Math.max(capacity - counts.active, 0);
+  const spotsLeft = Math.max(capacity - active, 0);
 
   return {
     id: camp.id,
@@ -230,8 +234,8 @@ function publicCamp(camp, registrations) {
     status: camp.status || "open",
     color: campColor(camp.color),
     spotsLeft,
-    activeCount: counts.active,
-    paidCount: counts.paid,
+    activeCount: active,
+    paidCount: paid,
     checkoutEnabled: Boolean(config?.checkoutEnabled),
     missingEnv: config?.missingEnv || [],
   };

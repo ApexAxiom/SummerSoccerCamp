@@ -15,6 +15,25 @@
   const MAX_CHILDREN = 8;
   const SUMMER_MONTHS = ["2026-06", "2026-07", "2026-08"];
 
+  // The API lives at same-origin /api on the local Node server, or at the Lambda
+  // Function URL in production. Amplify writes that URL into amplify_outputs.json,
+  // which is served as a static file; if it's absent we're running locally.
+  let API_BASE = "/api";
+  async function resolveApiBase() {
+    try {
+      const res = await fetch("/amplify_outputs.json", { headers: { accept: "application/json" } });
+      if (!res.ok) return;
+      const cfg = await res.json();
+      const url = cfg && cfg.custom && cfg.custom.apiUrl;
+      if (url) API_BASE = String(url).replace(/\/+$/, "");
+    } catch (error) {
+      // No outputs file (local dev) — keep the /api default.
+    }
+  }
+  function apiUrl(path) {
+    return `${API_BASE}${path}`;
+  }
+
   let camps = [];
   let selectedCamp = null;
 
@@ -343,7 +362,7 @@
   async function loadContact() {
     if (!contactInfo && !faqContact) return;
     try {
-      const response = await fetch("/api/config", { headers: { accept: "application/json" } });
+      const response = await fetch(apiUrl("/config"), { headers: { accept: "application/json" } });
       if (!response.ok) return;
       applyContact(await response.json());
     } catch (error) {
@@ -355,7 +374,7 @@
     if (!form || !calendarRoot) return;
 
     try {
-      const campsResponse = await fetch("/api/camps", { headers: { accept: "application/json" } });
+      const campsResponse = await fetch(apiUrl("/camps"), { headers: { accept: "application/json" } });
       if (!campsResponse.ok) throw new Error("Camp calendar endpoint is unavailable.");
 
       const campBody = await campsResponse.json();
@@ -372,6 +391,7 @@
   async function submitSignup(event) {
     event.preventDefault();
     clearMessage();
+    await apiReady;
 
     if (!selectedCamp) {
       showMessage("Pick a camp from the calendar before continuing.", "error");
@@ -390,7 +410,7 @@
     submitButton.textContent = "Creating Stripe checkout...";
 
     try {
-      const response = await fetch("/api/create-checkout-session", {
+      const response = await fetch(apiUrl("/create-checkout-session"), {
         method: "POST",
         headers: { "content-type": "application/json", accept: "application/json" },
         body: JSON.stringify(formPayload(form)),
@@ -451,7 +471,7 @@
     }
 
     try {
-      const response = await fetch(`/api/session-status?session_id=${encodeURIComponent(sessionId)}`, {
+      const response = await fetch(apiUrl(`/session-status?session_id=${encodeURIComponent(sessionId)}`), {
         headers: { accept: "application/json" },
       });
       const status = await response.json();
@@ -481,14 +501,20 @@
     }
   }
 
-  loadContact();
+  // Kick off API-base resolution immediately; everything that hits the backend
+  // awaits it. The form controls wire up synchronously so the page is interactive.
+  const apiReady = resolveApiBase();
 
   if (form) {
     if (addChildButton) addChildButton.addEventListener("click", addChildRow);
     addChildRow();
     form.addEventListener("submit", submitSignup);
-    loadAll();
   }
 
-  loadSuccessState();
+  (async function init() {
+    await apiReady;
+    loadContact();
+    if (form) loadAll();
+    loadSuccessState();
+  })();
 })();

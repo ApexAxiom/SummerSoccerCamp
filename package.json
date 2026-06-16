@@ -5,7 +5,25 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check server.js && node --check public/app.js && node --check public/admin.js && node --check shared/core.js && node --check shared/stripe.js && node --check shared/email.js",
-    "test": "node test/logic.test.js"
+    "check": "node --check server.js && node --check public/app.js && node --check public/admin.js && node --check shared/core.js && node --check shared/stripe.js && node --check shared/email.js && node --check amplify/functions/lib/store.js",
+    "test": "node test/logic.test.js",
+    "amplify:typecheck": "tsc -p amplify/tsconfig.json --noEmit",
+    "amplify:sandbox": "ampx sandbox",
+    "amplify:deploy": "ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.637.0",
+    "@aws-sdk/lib-dynamodb": "^3.637.0"
+  },
+  "devDependencies": {
+    "@aws-amplify/backend": "^1.4.0",
+    "@aws-amplify/backend-cli": "^1.2.5",
+    "@types/node": "^20.19.43",
+    "aws-cdk": "^2.155.0",
+    "aws-cdk-lib": "^2.155.0",
+    "constructs": "^10.3.0",
+    "esbuild": "^0.23.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.4"
   }
 }

@@ -6,3 +6,11 @@ data/*.json
 !data/.gitkeep
 screenshots/
 *.log
+
+# Amplify Gen 2 (generated)
+.amplify/
+amplify_outputs.json
+amplify_outputs.*
+public/amplify_outputs.json
+.npm/
+amplifyconfiguration*

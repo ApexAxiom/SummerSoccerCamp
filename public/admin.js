@@ -15,6 +15,25 @@
   let editingCampId = "";
   let latestCamps = [];
 
+  // Same-origin /api locally, or the Lambda Function URL in production (read from
+  // amplify_outputs.json). resolveApiBase runs once at load; calls await it.
+  let API_BASE = "/api";
+  async function resolveApiBase() {
+    try {
+      const res = await fetch("/amplify_outputs.json", { headers: { accept: "application/json" } });
+      if (!res.ok) return;
+      const cfg = await res.json();
+      const url = cfg && cfg.custom && cfg.custom.apiUrl;
+      if (url) API_BASE = String(url).replace(/\/+$/, "");
+    } catch (error) {
+      // No outputs file (local dev) — keep the /api default.
+    }
+  }
+  function apiUrl(path) {
+    return `${API_BASE}${path}`;
+  }
+  const apiReady = resolveApiBase();
+
   function setMessage(text, type) {
     message.hidden = !text;
     message.textContent = text || "";
@@ -264,7 +283,8 @@
     dashboard.innerHTML = '<div class="empty-state wide"><strong>Loading camps...</strong></div>';
 
     try {
-      const response = await fetch("/api/admin/dashboard", { headers: authHeaders() });
+      await apiReady;
+      const response = await fetch(apiUrl("/admin/dashboard"), { headers: authHeaders() });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || "Could not load camps.");
       login.hidden = true;
@@ -289,7 +309,8 @@
     saveCampButton.textContent = wasEditing ? "Saving changes..." : "Adding camp/day...";
 
     try {
-      const response = await fetch(wasEditing ? `/api/admin/camps/${encodeURIComponent(campId)}` : "/api/admin/camps", {
+      await apiReady;
+      const response = await fetch(wasEditing ? apiUrl(`/admin/camps/${encodeURIComponent(campId)}`) : apiUrl("/admin/camps"), {
         method: wasEditing ? "PATCH" : "POST",
         headers: {
           ...authHeaders(),
@@ -315,7 +336,8 @@
 
   async function updateCampStatus(campId, status) {
     try {
-      const response = await fetch(`/api/admin/camps/${encodeURIComponent(campId)}`, {
+      await apiReady;
+      const response = await fetch(apiUrl(`/admin/camps/${encodeURIComponent(campId)}`), {
         method: "PATCH",
         headers: {
           ...authHeaders(),

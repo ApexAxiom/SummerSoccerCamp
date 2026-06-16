@@ -1,17 +1,24 @@
 version: 1
-frontend:
+backend:
   phases:
-    preBuild:
-      commands:
-        - echo "No dependencies to install for the static frontend."
     build:
       commands:
-        - echo "No build step. Publishing the static files in public/ as-is."
+        # Install dependencies and deploy the Amplify Gen 2 backend (DynamoDB
+        # tables + Lambda functions + Function URLs). This writes amplify_outputs.json.
+        - npm ci || npm install
+        - npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
+frontend:
+  phases:
+    build:
+      commands:
+        # The frontend is plain HTML/CSS/JS in public/. Copy the generated backend
+        # config in so the browser can read the API URL, then publish public/.
+        - cp amplify_outputs.json public/amplify_outputs.json
   artifacts:
-    # The site is plain HTML/CSS/JS served from public/. There is no bundler,
-    # so the published directory is public/ — not a generated dist/ folder.
     baseDirectory: public
     files:
       - '**/*'
   cache:
-    paths: []
+    paths:
+      - node_modules/**/*
+      - .npm/**/*
