@@ -109,7 +109,7 @@
     campForm.elements.trainingType.value = "group";
     campForm.elements.ageMin.value = "5";
     campForm.elements.ageMax.value = "12";
-    campForm.elements.capacity.value = "12";
+    campForm.elements.capacity.value = "5";
     campForm.elements.color.value = "green";
     campForm.elements.status.value = "open";
     if (campFormTitle) campFormTitle.textContent = "Add a camp or day";

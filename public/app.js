@@ -254,15 +254,12 @@
       ...camps.map((camp) => camp.endDate.slice(0, 7)),
     ])).sort();
 
-    calendarRoot.innerHTML = monthKeys.map((key) => {
+    const monthsHtml = monthKeys.map((key) => {
       const monthCamps = camps.filter((camp) => campIntersectsMonth(camp, key));
-      return `
-        <article class="month-card">
-          <div class="month-title">${escapeHtml(monthLabel(key))}</div>
-          ${renderMonthGrid(key, monthCamps)}
-        </article>
-      `;
+      return renderMonth(key, monthCamps);
     }).join("");
+
+    calendarRoot.innerHTML = `<div class="calendar-months">${monthsHtml}</div>${renderAgenda()}`;
 
     calendarRoot.querySelectorAll("[data-camp-id]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -272,50 +269,154 @@
     });
   }
 
-  function renderMonthGrid(monthKey, monthCamps) {
-    const [year, month] = monthKey.split("-").map(Number);
-    const firstDay = new Date(year, month - 1, 1);
-    const daysInMonth = new Date(year, month, 0).getDate();
-    const blanks = firstDay.getDay();
-    const cells = [];
-
-    ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].forEach((day) => {
-      cells.push(`<div class="weekday">${day}</div>`);
-    });
-
-    for (let i = 0; i < blanks; i += 1) {
-      cells.push('<div class="calendar-day empty"></div>');
-    }
-
-    for (let day = 1; day <= daysInMonth; day += 1) {
-      const date = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-      const dayCamps = monthCamps.filter((camp) => campRunsOnDate(camp, date));
-      cells.push(`
-        <div class="calendar-day">
-          <span class="day-number">${day}</span>
-          ${dayCamps.map((camp) => renderCampButton(camp, date)).join("")}
-        </div>
-      `);
-    }
-
-    return `<div class="calendar-grid">${cells.join("")}</div>`;
+  function addDays(dateObj, n) {
+    return new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate() + n);
   }
 
-  function renderCampButton(camp, date) {
-    const disabled = canSelectCamp(camp) ? "" : "disabled";
-    const selected = selectedCamp?.id === camp.id ? " selected" : "";
-    const price = camp.displayPrice ? `<span>${escapeHtml(camp.displayPrice)}</span>` : "";
-    const color = camp.color || "green";
-    const phase = campDayPhase(camp, date);
+  function compactTime(value) {
+    return String(value || "").replace(/:00/g, "").replace(/\s+/g, " ").trim();
+  }
+
+  function timeRange(start, end) {
+    const s = compactTime(start);
+    const e = compactTime(end);
+    if (!s) return e;
+    if (!e) return s;
+    const sm = (s.match(/[AP]M/i) || [])[0];
+    const em = (e.match(/[AP]M/i) || [])[0];
+    if (sm && em && sm.toUpperCase() === em.toUpperCase()) {
+      return `${s.replace(/\s*[AP]M/i, "")}–${e}`;
+    }
+    return `${s}–${e}`;
+  }
+
+  function barMeta(camp) {
+    return [timeRange(camp.startTime, camp.endTime), campStatusText(camp)].filter(Boolean).join(" · ");
+  }
+
+  // Greedy interval packing: place each camp segment in the first lane (row)
+  // where it doesn't overlap an already-placed segment. Returns the lane count.
+  function packLanes(segments) {
+    const lanes = [];
+    segments
+      .slice()
+      .sort((a, b) => a.colStart - b.colStart || b.span - a.span)
+      .forEach((seg) => {
+        let lane = lanes.findIndex((placed) => placed.every((s) => seg.colStart > s.colEnd || seg.colEnd < s.colStart));
+        if (lane === -1) {
+          lane = lanes.length;
+          lanes.push([]);
+        }
+        lanes[lane].push(seg);
+        seg.lane = lane;
+      });
+    return Math.max(lanes.length, 1);
+  }
+
+  function renderBar(seg) {
+    const camp = seg.camp;
+    const selectable = canSelectCamp(camp);
+    const classes = ["bar"];
+    if (selectedCamp?.id === camp.id) classes.push("is-selected");
+    if (!selectable) classes.push("is-disabled");
+    const attrs = [
+      `class="${classes.join(" ")}"`,
+      "type=\"button\"",
+      `data-camp-id="${escapeHtml(camp.id)}"`,
+      `data-color="${escapeHtml(camp.color || "green")}"`,
+      seg.clipLeft ? "data-clip-left" : "",
+      seg.clipRight ? "data-clip-right" : "",
+      `style="grid-column:${seg.colStart + 1}/span ${seg.span};grid-row:${seg.lane + 1};"`,
+      selectable ? "" : "disabled",
+      `title="${escapeHtml(`${camp.title} · ${campDateRange(camp)} · ${barMeta(camp)}`)}"`,
+    ].filter(Boolean).join(" ");
+    return `<button ${attrs}>`
+      + `<span class="bar__title">${escapeHtml(camp.title)}</span>`
+      + `<span class="bar__meta">${escapeHtml(barMeta(camp))}</span>`
+      + "</button>";
+  }
+
+  function renderWeek(cells, monthCamps) {
+    const weekStart = cells[0].date;
+    const weekEnd = cells[6].date;
+
+    const segments = monthCamps
+      .filter((camp) => camp.startDate <= weekEnd && campEndDate(camp) >= weekStart)
+      .map((camp) => {
+        const segStart = camp.startDate > weekStart ? camp.startDate : weekStart;
+        const segEnd = campEndDate(camp) < weekEnd ? campEndDate(camp) : weekEnd;
+        const colStart = dayDifference(weekStart, segStart);
+        const colEnd = dayDifference(weekStart, segEnd);
+        return {
+          camp,
+          colStart,
+          colEnd,
+          span: colEnd - colStart + 1,
+          clipLeft: camp.startDate < weekStart,
+          clipRight: campEndDate(camp) > weekEnd,
+        };
+      });
+
+    const laneCount = packLanes(segments);
+    const dayCells = cells
+      .map((cell) => `<div class="day${cell.inMonth ? "" : " day--muted"}"><span class="day__num">${cell.day}</span></div>`)
+      .join("");
+    const bars = segments.map(renderBar).join("");
+
     return `
-      <button class="camp-chip${selected}" type="button" data-camp-id="${escapeHtml(camp.id)}" data-color="${escapeHtml(color)}" data-phase="${escapeHtml(phase)}" ${disabled}>
-        <strong>${escapeHtml(camp.title)}</strong>
-        <span>${escapeHtml(campDayLabel(camp, date))}</span>
-        <span>${escapeHtml(camp.startTime)} to ${escapeHtml(camp.endTime)}</span>
-        <span>${escapeHtml(campStatusText(camp))}</span>
-        ${price}
-      </button>
-    `;
+      <div class="week">
+        <div class="week__days">${dayCells}</div>
+        <div class="week__bars" style="grid-template-rows:repeat(${laneCount}, var(--bar-h));">${bars}</div>
+      </div>`;
+  }
+
+  function renderMonth(monthKey, monthCamps) {
+    const [year, month] = monthKey.split("-").map(Number);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const firstWeekday = new Date(year, month - 1, 1).getDay();
+    const firstSunday = new Date(year, month - 1, 1 - firstWeekday);
+    const weekCount = Math.ceil((firstWeekday + daysInMonth) / 7);
+
+    const weeks = [];
+    for (let w = 0; w < weekCount; w += 1) {
+      const cells = [];
+      for (let c = 0; c < 7; c += 1) {
+        const d = addDays(firstSunday, w * 7 + c);
+        cells.push({ date: dateKey(d), day: d.getDate(), inMonth: d.getMonth() === month - 1 });
+      }
+      weeks.push(cells);
+    }
+
+    const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => `<span>${d}</span>`).join("");
+    const monthName = new Date(year, month - 1, 1).toLocaleDateString("en-US", { month: "long" });
+
+    return `
+      <article class="month">
+        <header class="month__head">
+          <span class="month__name">${escapeHtml(monthName)}</span>
+          <span class="month__year">${year}</span>
+        </header>
+        <div class="month__weekdays">${weekdays}</div>
+        <div class="month__weeks">${weeks.map((cells) => renderWeek(cells, monthCamps)).join("")}</div>
+      </article>`;
+  }
+
+  function renderAgenda() {
+    const items = camps
+      .slice()
+      .sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)))
+      .map((camp) => {
+        const selectable = canSelectCamp(camp);
+        const classes = ["agenda__item"];
+        if (selectedCamp?.id === camp.id) classes.push("is-selected");
+        if (!selectable) classes.push("is-disabled");
+        return `<button class="${classes.join(" ")}" type="button" data-camp-id="${escapeHtml(camp.id)}" data-color="${escapeHtml(camp.color || "green")}"${selectable ? "" : " disabled"}>`
+          + `<span class="agenda__date">${escapeHtml(campDateRange(camp))}</span>`
+          + `<span class="agenda__title">${escapeHtml(camp.title)}</span>`
+          + `<span class="agenda__meta">${escapeHtml(barMeta(camp))}</span>`
+          + "</button>";
+      }).join("");
+    return `<div class="agenda">${items}</div>`;
   }
 
   function updateSelectedCamp(camp) {

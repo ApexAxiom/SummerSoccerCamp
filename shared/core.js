@@ -161,7 +161,7 @@ function createStarterCamps() {
     location: "Cole's Crossing Soccer Field",
     ageMin: 5,
     ageMax: 12,
-    capacity: 20,
+    capacity: 5,
     displayPrice: "$50",
     notes: "Bring water, cleats, shin guards, and a ball if you have one.",
     status: "open",
