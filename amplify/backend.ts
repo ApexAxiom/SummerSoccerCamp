@@ -1,5 +1,5 @@
 import { defineBackend } from "@aws-amplify/backend";
-import { CfnOutput } from "aws-cdk-lib";
+import { CfnOutput, Stack } from "aws-cdk-lib";
 import { AttributeType, BillingMode, Table } from "aws-cdk-lib/aws-dynamodb";
 import { Function as LambdaFunction, FunctionUrlAuthType, HttpMethod } from "aws-cdk-lib/aws-lambda";
 import { api } from "./functions/api/resource";
@@ -112,7 +112,7 @@ backend.addOutput({
   },
 });
 
-new CfnOutput(dataStack, "StripeWebhookUrl", {
+new CfnOutput(Stack.of(webhookLambda), "StripeWebhookUrl", {
   value: webhookUrl.url,
   description: "Put this URL in the Stripe dashboard as the webhook endpoint.",
 });
