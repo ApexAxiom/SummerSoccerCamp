@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Browse Noah Westra's summer soccer camps in Cypress, Texas, pick a date, and sign up. Secure payment through Stripe Checkout.">
+  <title>Summer Camps | Noah Westra Soccer Training</title>
+  <link rel="stylesheet" href="/styles.css?v=20260616a">
+</head>
+<body>
+  <header class="topbar" aria-label="Site header">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true">NW</span>
+      <span>Noah Soccer Training</span>
+    </a>
+    <nav class="nav" aria-label="Primary navigation">
+      <a href="/">Home</a>
+      <a href="#calendar">Camps</a>
+      <a href="/admin.html">Coach view</a>
+    </nav>
+  </header>
+
+  <main>
+    <section id="calendar" class="section calendar-section">
+      <div class="calendar-head">
+        <div>
+          <p class="section-kicker">Summer calendar</p>
+          <h2>Pick a camp, then sign up and pay.</h2>
+        </div>
+        <div id="backend-status" class="status-panel" role="status">Checking payment setup...</div>
+      </div>
+      <div id="camp-calendar" class="camp-calendar" aria-live="polite"></div>
+    </section>
+
+    <section id="signup" class="section signup-section">
+      <div class="signup-copy">
+        <p class="section-kicker">Parent signup</p>
+        <h2>Confirm the details for your child.</h2>
+        <p>Choose a camp above first. The server creates a Stripe Checkout session for that camp and only marks the roster paid after Stripe confirms it.</p>
+        <div id="selected-camp" class="selected-camp" role="status">
+          <strong>No camp selected yet.</strong>
+          <span>Pick an open camp from the calendar to enable signup.</span>
+        </div>
+      </div>
+
+      <form id="signup-form" class="signup-form" novalidate>
+        <input class="hidden-field" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <input type="hidden" name="campId" id="camp-id">
+
+        <div id="children-list" class="children-list"></div>
+        <button type="button" id="add-child" class="button secondary compact add-child">+ Add another child</button>
+
+        <div class="form-grid two">
+          <label>
+            <span>Parent name</span>
+            <input name="parentName" autocomplete="name" required>
+          </label>
+          <label>
+            <span>Parent email</span>
+            <input name="parentEmail" type="email" autocomplete="email" required>
+          </label>
+        </div>
+
+        <label>
+          <span>Parent phone</span>
+          <input name="parentPhone" inputmode="tel" autocomplete="tel" required>
+        </label>
+
+        <div class="form-grid two">
+          <label>
+            <span>Emergency contact name</span>
+            <input name="emergencyName" autocomplete="off" required>
+          </label>
+          <label>
+            <span>Emergency contact phone</span>
+            <input name="emergencyPhone" inputmode="tel" autocomplete="off" required>
+          </label>
+        </div>
+
+        <label>
+          <span>Allergies or medical notes</span>
+          <textarea name="medicalNotes" rows="2" placeholder="Allergies, asthma, or anything Noah should know in an emergency. If more than one child, note who. Leave blank if none."></textarea>
+        </label>
+
+        <label>
+          <span>What should Noah help with? <em class="optional">(optional)</em></span>
+          <textarea name="goals" rows="3" placeholder="Example: first touch, shooting, dribbling, confidence, tryout prep"></textarea>
+        </label>
+
+        <label class="waiver">
+          <input type="checkbox" name="waiverAccepted" required>
+          <span>I am the parent or guardian, and I understand soccer training involves physical activity and normal risk.</span>
+        </label>
+
+        <div id="form-message" class="form-message" role="alert" hidden></div>
+        <button id="submit-button" class="button primary full" type="submit" disabled>Pick a camp to continue</button>
+      </form>
+    </section>
+  </main>
+
+  <template id="child-row-template">
+    <div class="child-row" data-child-row>
+      <div class="child-row-head">
+        <span class="child-row-title">Player 1</span>
+        <button type="button" class="link-button" data-remove-child hidden>Remove</button>
+      </div>
+      <div class="form-grid two">
+        <label>
+          <span>Child's name</span>
+          <input name="camperName" autocomplete="off" required>
+        </label>
+        <label>
+          <span>Child's age</span>
+          <input name="camperAge" inputmode="numeric" required>
+        </label>
+      </div>
+    </div>
+  </template>
+
+  <footer class="footer">
+    <div class="footer-main">
+      <span>Noah Westra Soccer Training</span>
+      <span id="contact-info" class="contact-info"></span>
+    </div>
+    <a href="/admin.html">Coach view</a>
+  </footer>
+
+  <script src="/app.js?v=20260616a"></script>
+</body>
+</html>

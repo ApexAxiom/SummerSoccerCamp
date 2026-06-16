@@ -1120,6 +1120,27 @@ textarea:focus {
   color: var(--navy);
 }
 
+.cta-band {
+  align-items: center;
+  background: var(--grass-dark);
+  color: var(--white);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px 40px;
+  justify-content: space-between;
+}
+
+.cta-band h2 {
+  color: var(--white);
+  margin: 6px 0 0;
+}
+
+.cta-copy {
+  color: rgba(255, 255, 255, 0.82);
+  margin: 10px 0 0;
+  max-width: 42ch;
+}
+
 @media (max-width: 860px) {
   .topbar {
     align-items: flex-start;

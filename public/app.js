@@ -340,19 +340,24 @@
     document.querySelector("#signup")?.scrollIntoView({ block: "start" });
   }
 
+  async function loadContact() {
+    if (!contactInfo && !faqContact) return;
+    try {
+      const response = await fetch("/api/config", { headers: { accept: "application/json" } });
+      if (!response.ok) return;
+      applyContact(await response.json());
+    } catch (error) {
+      // Contact info is non-critical; leave the defaults in place.
+    }
+  }
+
   async function loadAll() {
     if (!form || !calendarRoot) return;
 
     try {
-      const [configResponse, campsResponse] = await Promise.all([
-        fetch("/api/config", { headers: { accept: "application/json" } }),
-        fetch("/api/camps", { headers: { accept: "application/json" } }),
-      ]);
-      if (!configResponse.ok) throw new Error("Config endpoint is unavailable.");
+      const campsResponse = await fetch("/api/camps", { headers: { accept: "application/json" } });
       if (!campsResponse.ok) throw new Error("Camp calendar endpoint is unavailable.");
 
-      const config = await configResponse.json();
-      applyContact(config);
       const campBody = await campsResponse.json();
       camps = (campBody.camps || []).sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)));
       renderCalendar();
@@ -475,6 +480,8 @@
       ].join("");
     }
   }
+
+  loadContact();
 
   if (form) {
     if (addChildButton) addChildButton.addEventListener("click", addChildRow);
