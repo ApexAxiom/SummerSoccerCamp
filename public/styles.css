@@ -188,6 +188,17 @@ textarea {
   margin-top: 30px;
 }
 
+.hero .button.secondary {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.26);
+  color: var(--white);
+}
+
+.hero .button.secondary:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
 .button {
   align-items: center;
   border: 0;
@@ -1284,34 +1295,23 @@ textarea:focus {
 }
 
 @media (max-width: 860px) {
-  .topbar {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .nav {
-    justify-content: flex-start;
-  }
-
   .hero {
-    min-height: 760px;
+    min-height: 640px;
   }
 
   .hero-photo {
-    height: 48%;
+    height: 50%;
     inset: auto 0 0;
-    object-position: 50% 18%;
+    object-position: 50% 16%;
     width: 100%;
   }
 
   .hero-wash {
-    background:
-      linear-gradient(180deg, rgba(16, 35, 63, 0.98) 0%, rgba(16, 35, 63, 0.86) 52%, rgba(16, 35, 63, 0.24) 82%, rgba(16, 35, 63, 0.12) 100%),
-      radial-gradient(circle at 12% 36%, rgba(31, 122, 77, 0.72), transparent 42%);
+    background: linear-gradient(180deg, rgba(20, 22, 28, 0.96) 0%, rgba(20, 22, 28, 0.82) 46%, rgba(20, 22, 28, 0.34) 74%, rgba(20, 22, 28, 0) 100%);
   }
 
   .hero-content {
-    padding-top: 52px;
+    padding-top: 44px;
   }
 
   .intro-grid,
@@ -1336,12 +1336,30 @@ textarea:focus {
 }
 
 @media (max-width: 560px) {
+  .nav {
+    display: none;
+  }
+
   .hero {
-    min-height: 720px;
+    min-height: 600px;
+  }
+
+  .hero-content {
+    padding-top: 36px;
+  }
+
+  .eyebrow {
+    font-size: 0.72rem;
+    margin-bottom: 10px;
   }
 
   .hero h1 {
-    font-size: 3.25rem;
+    font-size: 2.35rem;
+  }
+
+  .hero-copy {
+    font-size: 1.02rem;
+    margin-top: 16px;
   }
 
   .hero-actions,
@@ -1349,6 +1367,11 @@ textarea:focus {
   .admin-head {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .hero-actions {
+    gap: 10px;
+    margin-top: 22px;
   }
 
   .button {
