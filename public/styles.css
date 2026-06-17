@@ -1390,13 +1390,54 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 
-  .calendar-months {
-    display: none;
+  /* Keep the real month calendar on phones, just denser, so the overlapping
+     camp bars stay visible. The bar meta is dropped to fit; tap a bar to see
+     full details (time, spots, location) in the panel below. */
+  .month__weeks {
+    --bar-h: 22px;
   }
 
-  .agenda {
-    display: grid;
-    gap: 10px;
+  .month__head {
+    padding: 14px 14px 10px;
+  }
+
+  .month__name {
+    font-size: 1.1rem;
+  }
+
+  .month__weekdays {
+    padding: 0 4px 6px;
+  }
+
+  .month__weekdays span {
+    font-size: 0.58rem;
+  }
+
+  .day {
+    padding: 5px 5px 1px;
+  }
+
+  .day__num {
+    font-size: 0.72rem;
+  }
+
+  .week__bars {
+    gap: 3px 0;
+  }
+
+  .bar {
+    border-radius: 5px;
+    gap: 0;
+    margin: 0 2px;
+    padding: 0 5px;
+  }
+
+  .bar__title {
+    font-size: 0.64rem;
+  }
+
+  .bar__meta {
+    display: none;
   }
 
   .section {
