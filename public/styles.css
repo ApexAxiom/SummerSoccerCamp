@@ -1313,9 +1313,9 @@ textarea:focus {
   }
 
   .hero-photo {
-    height: 50%;
+    height: 56%;
     inset: auto 0 0;
-    object-position: 50% 16%;
+    object-position: 52% 12%;
     width: 100%;
   }
 
@@ -1355,7 +1355,12 @@ textarea:focus {
   }
 
   .hero {
-    min-height: 560px;
+    min-height: 640px;
+  }
+
+  .hero-photo {
+    height: 66%;
+    object-position: 52% 8%;
   }
 
   .hero-content {
