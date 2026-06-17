@@ -124,9 +124,9 @@ textarea {
   height: 100%;
   inset: 0 0 0 auto;
   object-fit: cover;
-  object-position: 68% 18%;
+  object-position: 50% 18%;
   position: absolute;
-  width: min(62vw, 900px);
+  width: min(50vw, 640px);
 }
 
 .hero-wash {
