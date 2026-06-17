@@ -1364,7 +1364,8 @@ textarea:focus {
   }
 
   .hero-content {
-    padding-top: 36px;
+    padding-top: 18px;
+    padding-left: 14px;
   }
 
   .eyebrow {
