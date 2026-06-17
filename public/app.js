@@ -52,8 +52,13 @@
 
   function setStatus(text, ready) {
     if (!statusPanel) return;
+    if (ready || !text) {
+      statusPanel.hidden = true;
+      return;
+    }
+    statusPanel.hidden = false;
     statusPanel.textContent = text;
-    statusPanel.dataset.ready = ready ? "true" : "false";
+    statusPanel.dataset.ready = "false";
   }
 
   function childrenPayload() {
@@ -232,20 +237,20 @@
     if (!camps.length) {
       calendarRoot.innerHTML = [
         '<div class="empty-state wide">',
-        "<strong>No camp dates have been posted yet.</strong>",
-        "<span>Noah can add summer camp weeks or single-day sessions from Coach view. Once a real camp is added, parents can pick it here and pay through Stripe.</span>",
+        "<strong>Camp dates are coming soon!</strong>",
+        "<span>Check back shortly — Noah's lining up this summer's sessions.</span>",
         "</div>",
       ].join("");
-      setStatus("No camp dates are published yet. Use Coach view to add the first camp.", false);
+      setStatus("Camp dates are coming soon — check back shortly!", false);
       updateSelectedCamp(null);
       return;
     }
 
     const missing = Array.from(new Set(camps.flatMap((camp) => camp.missingEnv || [])));
     if (missing.length) {
-      setStatus(`Some payments are not live yet. Missing setup: ${missing.join(", ")}.`, false);
+      setStatus("Online signup is opening soon — you can browse the camps now.", false);
     } else {
-      setStatus("Stripe checkout is connected for the published camp types.", true);
+      setStatus("", true);
     }
 
     const monthKeys = Array.from(new Set([
@@ -428,8 +433,8 @@
 
     if (!camp) {
       selectedCampPanel.innerHTML = [
-        "<strong>No camp selected yet.</strong>",
-        "<span>Pick an open camp from the calendar to enable signup.</span>",
+        "<strong>No camp picked yet.</strong>",
+        "<span>Tap a camp on the calendar above to get started.</span>",
       ].join("");
       submitButton.disabled = true;
       submitButton.textContent = "Pick a camp to continue";
@@ -446,8 +451,8 @@
 
     if (!camp.checkoutEnabled) {
       submitButton.disabled = true;
-      submitButton.textContent = "Stripe setup needed";
-      showMessage(`Stripe is not configured for this camp yet. Missing: ${(camp.missingEnv || []).join(", ")}.`, "error");
+      submitButton.textContent = "Signups opening soon";
+      showMessage("Online signup for this camp is opening soon — check back shortly.", "info");
     } else if (!canSelectCamp(camp)) {
       submitButton.disabled = true;
       submitButton.textContent = camp.status === "open" ? "Camp is full" : "Camp is closed";
@@ -483,8 +488,8 @@
       renderCalendar();
     } catch (error) {
       camps = [];
-      calendarRoot.innerHTML = '<div class="empty-state wide"><strong>Calendar could not load.</strong><span>Start or restart the Node server, then refresh this page.</span></div>';
-      setStatus("Backend is not running yet. Start the Node server to enable the calendar and Stripe checkout.", false);
+      calendarRoot.innerHTML = '<div class="empty-state wide"><strong>We couldn\'t load the camps.</strong><span>Please refresh the page in a moment.</span></div>';
+      setStatus("We couldn't load the camps right now. Please refresh in a moment.", false);
       updateSelectedCamp(null);
     }
   }
@@ -495,20 +500,20 @@
     await apiReady;
 
     if (!selectedCamp) {
-      showMessage("Pick a camp from the calendar before continuing.", "error");
+      showMessage("Please pick a camp from the calendar first.", "error");
       document.querySelector("#calendar")?.scrollIntoView({ block: "start" });
       return;
     }
 
     if (!canCheckoutCamp(selectedCamp)) {
-      showMessage("This camp is not ready for checkout yet.", "error");
+      showMessage("This camp isn't open for signup right now.", "error");
       return;
     }
 
     if (!form.reportValidity()) return;
 
     submitButton.disabled = true;
-    submitButton.textContent = "Creating Stripe checkout...";
+    submitButton.textContent = "Taking you to checkout…";
 
     try {
       const response = await fetch(apiUrl("/create-checkout-session"), {
@@ -519,16 +524,18 @@
       const body = await response.json().catch(() => ({}));
 
       if (!response.ok) {
+        if (body.missingEnv && body.missingEnv.length) {
+          throw new Error("Online signup for this camp is opening soon — check back shortly.");
+        }
         const detail = friendlyValidationErrors(body.details);
-        const missing = body.missingEnv ? ` Missing setup: ${body.missingEnv.join(", ")}.` : "";
-        throw new Error(`${body.error || "Could not start checkout."} ${detail}${missing}`.trim());
+        throw new Error(`${body.error || "Sorry, we couldn't start checkout."} ${detail}`.trim());
       }
 
-      if (!body.url) throw new Error("Stripe did not return a checkout URL.");
+      if (!body.url) throw new Error("Sorry, we couldn't reach checkout. Please try again.");
       window.location.assign(body.url);
     } catch (error) {
       submitButton.disabled = !canCheckoutCamp(selectedCamp);
-      submitButton.textContent = canCheckoutCamp(selectedCamp) ? "Continue to Stripe" : "Stripe setup needed";
+      submitButton.textContent = canCheckoutCamp(selectedCamp) ? "Continue to Stripe" : "Signups opening soon";
       showMessage(error.message, "error");
       await loadAll();
     }
@@ -538,7 +545,7 @@
     const names = status.camperNames || [];
     if (names.length > 1) return `${names.length} players are signed up!`;
     if (names.length === 1) return `${names[0]} is signed up!`;
-    return "You are signed up!";
+    return "You're signed up!";
   }
 
   function successDetails(status) {
@@ -564,9 +571,9 @@
 
     if (!sessionId) {
       successState.innerHTML = [
-        '<p class="section-kicker">Missing session</p>',
-        "<h1>We could not find a Stripe session.</h1>",
-        '<p class="muted">Please use the signup page again or check your Stripe receipt.</p>',
+        '<p class="section-kicker">Hmm</p>',
+        "<h1>We couldn't find your signup.</h1>",
+        '<p class="muted">Head back to the camps page and try again, or check your email for a Stripe receipt.</p>',
       ].join("");
       return;
     }
@@ -579,25 +586,25 @@
 
       if (response.ok && status.status === "paid") {
         successState.innerHTML = [
-          '<p class="section-kicker">Payment confirmed</p>',
+          '<p class="section-kicker">You\'re in!</p>',
           `<h1>${escapeHtml(playersHeadline(status))}</h1>`,
-          '<p class="muted">Stripe confirmed your payment. A confirmation email is on its way, and Noah can see the registration in his coach view.</p>',
+          '<p class="muted">Your payment went through and a confirmation email is on its way. See you on the field!</p>',
           successDetails(status),
         ].join("");
         return;
       }
 
       successState.innerHTML = [
-        '<p class="section-kicker">Payment received by Stripe</p>',
-        "<h1>Waiting for roster confirmation.</h1>",
-        '<p class="muted">The success redirect returned, but the server has not seen the Stripe webhook yet. Refresh in a moment.</p>',
+        '<p class="section-kicker">Almost there</p>',
+        "<h1>Confirming your spot…</h1>",
+        '<p class="muted">Your payment went through — we\'re just wrapping up. This page will update in a few seconds.</p>',
         successDetails(status),
       ].join("");
     } catch (error) {
       successState.innerHTML = [
-        '<p class="section-kicker">Backend unavailable</p>',
-        "<h1>We could not verify the roster yet.</h1>",
-        '<p class="muted">Keep your Stripe receipt. The server must be running to show live confirmation here.</p>',
+        '<p class="section-kicker">Hang tight</p>',
+        "<h1>We're confirming your signup.</h1>",
+        '<p class="muted">Keep your Stripe receipt handy. If this doesn\'t update shortly, reach out to Noah and we\'ll sort it out.</p>',
       ].join("");
     }
   }

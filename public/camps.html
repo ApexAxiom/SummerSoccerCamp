@@ -6,7 +6,7 @@
   <meta name="description" content="Browse Noah Westra's summer soccer camps in Cypress, Texas, pick a date, and sign up. Secure payment through Stripe Checkout.">
   <title>Summer Camps | Noah Westra Soccer Training</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/styles.css?v=20260617c">
+  <link rel="stylesheet" href="/styles.css?v=20260618a">
 </head>
 <body>
   <header class="topbar" aria-label="Site header">
@@ -15,9 +15,8 @@
       <span>Noah Soccer Training</span>
     </a>
     <nav class="nav" aria-label="Primary navigation">
-      <a href="/">Home</a>
-      <a href="#calendar">Camps</a>
-      <a href="/admin.html">Coach view</a>
+      <a href="/camps.html">Camps</a>
+      <a href="/faq.html">FAQ</a>
     </nav>
   </header>
 
@@ -28,19 +27,19 @@
           <p class="section-kicker">Summer calendar</p>
           <h2>Pick a camp, then sign up and pay.</h2>
         </div>
-        <div id="backend-status" class="status-panel" role="status">Checking payment setup...</div>
+        <div id="backend-status" class="status-panel" role="status" hidden>Loading camps…</div>
       </div>
       <div id="camp-calendar" class="camp-calendar" aria-live="polite"></div>
     </section>
 
     <section id="signup" class="section signup-section">
       <div class="signup-copy">
-        <p class="section-kicker">Parent signup</p>
-        <h2>Confirm the details for your child.</h2>
-        <p>Choose a camp above first. The server creates a Stripe Checkout session for that camp and only marks the roster paid after Stripe confirms it.</p>
+        <p class="section-kicker">Sign up</p>
+        <h2>Tell us about your player.</h2>
+        <p>Pick a camp on the calendar above, then add your player's details. You'll finish on Stripe's secure checkout and get a confirmation by email.</p>
         <div id="selected-camp" class="selected-camp" role="status">
-          <strong>No camp selected yet.</strong>
-          <span>Pick an open camp from the calendar to enable signup.</span>
+          <strong>No camp picked yet.</strong>
+          <span>Tap a camp on the calendar above to get started.</span>
         </div>
       </div>
 
@@ -126,6 +125,6 @@
     <a href="/admin.html">Coach view</a>
   </footer>
 
-  <script src="/app.js?v=20260617c"></script>
+  <script src="/app.js?v=20260618a"></script>
 </body>
 </html>

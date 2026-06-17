@@ -1221,6 +1221,19 @@ textarea:focus {
   margin: 0;
 }
 
+.faq-intro {
+  margin: 12px 0 0;
+  max-width: 52ch;
+}
+
+.faq-cta {
+  margin-top: 30px;
+}
+
+.intro-cta {
+  margin-top: 24px;
+}
+
 .footer-main {
   align-items: center;
   display: flex;
@@ -1337,11 +1350,12 @@ textarea:focus {
 
 @media (max-width: 560px) {
   .nav {
-    display: none;
+    font-size: 0.9rem;
+    gap: 14px;
   }
 
   .hero {
-    min-height: 600px;
+    min-height: 560px;
   }
 
   .hero-content {
