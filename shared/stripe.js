@@ -67,7 +67,7 @@ function parseStripeSignature(header) {
 }
 
 // Verifies Stripe's signature over the exact raw request bytes. rawBody must be a
-// Buffer of the unparsed body — re-serializing the JSON would change the bytes
+// Buffer of the unparsed body; re-serializing the JSON would change the bytes
 // and break verification.
 function verifyStripeSignature(rawBody, signatureHeader) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;

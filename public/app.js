@@ -27,7 +27,7 @@
       const url = cfg && cfg.custom && cfg.custom.apiUrl;
       if (url) API_BASE = String(url).replace(/\/+$/, "");
     } catch (error) {
-      // No outputs file (local dev) — keep the /api default.
+      // No outputs file (local dev), so keep the /api default.
     }
   }
   function apiUrl(path) {
@@ -238,17 +238,17 @@
       calendarRoot.innerHTML = [
         '<div class="empty-state wide">',
         "<strong>Camp dates are coming soon!</strong>",
-        "<span>Check back shortly — Noah's lining up this summer's sessions.</span>",
+        "<span>Check back shortly. Noah's lining up this summer's sessions.</span>",
         "</div>",
       ].join("");
-      setStatus("Camp dates are coming soon — check back shortly!", false);
+      setStatus("Camp dates are coming soon. Check back shortly!", false);
       updateSelectedCamp(null);
       return;
     }
 
     const missing = Array.from(new Set(camps.flatMap((camp) => camp.missingEnv || [])));
     if (missing.length) {
-      setStatus("Online signup is opening soon — you can browse the camps now.", false);
+      setStatus("Online signup is opening soon. You can browse the camps now.", false);
     } else {
       setStatus("", true);
     }
@@ -290,9 +290,9 @@
     const sm = (s.match(/[AP]M/i) || [])[0];
     const em = (e.match(/[AP]M/i) || [])[0];
     if (sm && em && sm.toUpperCase() === em.toUpperCase()) {
-      return `${s.replace(/\s*[AP]M/i, "")}–${e}`;
+      return `${s.replace(/\s*[AP]M/i, "")}-${e}`;
     }
-    return `${s}–${e}`;
+    return `${s}-${e}`;
   }
 
   function barMeta(camp) {
@@ -452,7 +452,7 @@
     if (!camp.checkoutEnabled) {
       submitButton.disabled = true;
       submitButton.textContent = "Signups opening soon";
-      showMessage("Online signup for this camp is opening soon — check back shortly.", "info");
+      showMessage("Online signup for this camp is opening soon. Check back shortly.", "info");
     } else if (!canSelectCamp(camp)) {
       submitButton.disabled = true;
       submitButton.textContent = camp.status === "open" ? "Camp is full" : "Camp is closed";
@@ -525,7 +525,7 @@
 
       if (!response.ok) {
         if (body.missingEnv && body.missingEnv.length) {
-          throw new Error("Online signup for this camp is opening soon — check back shortly.");
+          throw new Error("Online signup for this camp is opening soon. Check back shortly.");
         }
         const detail = friendlyValidationErrors(body.details);
         throw new Error(`${body.error || "Sorry, we couldn't start checkout."} ${detail}`.trim());
@@ -597,7 +597,7 @@
       successState.innerHTML = [
         '<p class="section-kicker">Almost there</p>',
         "<h1>Confirming your spot…</h1>",
-        '<p class="muted">Your payment went through — we\'re just wrapping up. This page will update in a few seconds.</p>',
+        '<p class="muted">Your payment went through, and we\'re just wrapping up. This page will update in a few seconds.</p>',
         successDetails(status),
       ].join("");
     } catch (error) {

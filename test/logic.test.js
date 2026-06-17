@@ -177,7 +177,7 @@ test("requireStripeConfig throws 503 when unset and returns the price id when se
 
 test("formatCampDates renders a single day and a range", () => {
   assert.strictEqual(core.formatCampDates("2026-06-15", "2026-06-15"), "June 15, 2026");
-  assert.strictEqual(core.formatCampDates("2026-06-15", "2026-06-18"), "June 15, 2026 – June 18, 2026");
+  assert.strictEqual(core.formatCampDates("2026-06-15", "2026-06-18"), "June 15, 2026 to June 18, 2026");
 });
 
 test("verifyStripeSignature accepts a correct signature and rejects tampering", () => {

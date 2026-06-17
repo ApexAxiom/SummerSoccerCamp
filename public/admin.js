@@ -26,7 +26,7 @@
       const url = cfg && cfg.custom && cfg.custom.apiUrl;
       if (url) API_BASE = String(url).replace(/\/+$/, "");
     } catch (error) {
-      // No outputs file (local dev) — keep the /api default.
+      // No outputs file (local dev), so keep the /api default.
     }
   }
   function apiUrl(path) {

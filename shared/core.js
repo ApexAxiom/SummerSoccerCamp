@@ -28,15 +28,15 @@ const SERVICES = [
 ];
 
 const STARTER_CAMP_WEEKS = [
-  { startDate: "2026-06-15", endDate: "2026-06-18" },
-  { startDate: "2026-06-22", endDate: "2026-06-25" },
-  { startDate: "2026-06-29", endDate: "2026-07-02" },
-  { startDate: "2026-07-06", endDate: "2026-07-09" },
-  { startDate: "2026-07-13", endDate: "2026-07-16" },
-  { startDate: "2026-07-20", endDate: "2026-07-23" },
-  { startDate: "2026-07-27", endDate: "2026-07-30" },
-  { startDate: "2026-08-03", endDate: "2026-08-06" },
-  { startDate: "2026-08-10", endDate: "2026-08-13" },
+  { startDate: "2026-06-15", endDate: "2026-06-18", type: "group" },
+  { startDate: "2026-06-22", endDate: "2026-06-24", type: "private" },
+  { startDate: "2026-06-29", endDate: "2026-07-02", type: "group" },
+  { startDate: "2026-07-06", endDate: "2026-07-08", type: "private" },
+  { startDate: "2026-07-13", endDate: "2026-07-16", type: "group" },
+  { startDate: "2026-07-20", endDate: "2026-07-22", type: "private" },
+  { startDate: "2026-07-27", endDate: "2026-07-30", type: "group" },
+  { startDate: "2026-08-03", endDate: "2026-08-05", type: "private" },
+  { startDate: "2026-08-10", endDate: "2026-08-13", type: "group" },
 ];
 
 const STARTER_CAMP_BY_ID = new Map(STARTER_CAMP_WEEKS.map((week) => [`starter_${week.startDate}`, week]));
@@ -81,7 +81,7 @@ function formatCampDates(startDate, endDate) {
   const start = new Date(`${startDate}T00:00:00Z`).toLocaleDateString("en-US", options);
   if (!endDate || endDate === startDate) return start;
   const end = new Date(`${endDate}T00:00:00Z`).toLocaleDateString("en-US", options);
-  return `${start} – ${end}`;
+  return `${start} to ${end}`;
 }
 
 function escapeForEmail(value) {
@@ -148,25 +148,28 @@ function requireStripeConfig(service) {
 
 function createStarterCamps() {
   const now = new Date().toISOString();
-  return STARTER_CAMP_WEEKS.map((week) => ({
-    id: `starter_${week.startDate}`,
-    createdAt: now,
-    updatedAt: now,
-    title: "Summer Skills Camp",
-    trainingType: "group",
-    startDate: week.startDate,
-    endDate: week.endDate,
-    startTime: "9:00 AM",
-    endTime: "11:00 AM",
-    location: "Cole's Crossing Soccer Field",
-    ageMin: 5,
-    ageMax: 12,
-    capacity: 5,
-    displayPrice: "$50",
-    notes: "Bring water, cleats, shin guards, and a ball if you have one.",
-    status: "open",
-    color: DEFAULT_CAMP_COLOR,
-  }));
+  return STARTER_CAMP_WEEKS.map((week) => {
+    const isGroup = week.type === "group";
+    return {
+      id: `starter_${week.startDate}`,
+      createdAt: now,
+      updatedAt: now,
+      title: isGroup ? "Small Group Camp" : "1-on-1 Training",
+      trainingType: isGroup ? "group" : "private",
+      startDate: week.startDate,
+      endDate: week.endDate,
+      startTime: "9:00 AM",
+      endTime: "11:00 AM",
+      location: "Cole's Crossing Soccer Field",
+      ageMin: 5,
+      ageMax: 12,
+      capacity: isGroup ? 5 : 1,
+      displayPrice: isGroup ? "$30" : "$50",
+      notes: "Bring water, cleats, shin guards, and a ball if you have one.",
+      status: "open",
+      color: isGroup ? "green" : "blue",
+    };
+  });
 }
 
 function normalizeStoredCamps(camps) {

@@ -91,15 +91,15 @@ async function sendSignupEmails(groupRegistrations) {
       `New paid signup for ${first.campTitle} (${formatCampDates(first.campStartDate, first.campEndDate)}).`,
       "",
       `Players: ${camperNames.join(", ")}`,
-      `Parent: ${first.parentName} — ${first.parentEmail} — ${first.parentPhone}`,
-      first.emergencyName ? `Emergency contact: ${first.emergencyName} — ${first.emergencyPhone}` : "",
+      `Parent: ${first.parentName}, ${first.parentEmail}, ${first.parentPhone}`,
+      first.emergencyName ? `Emergency contact: ${first.emergencyName}, ${first.emergencyPhone}` : "",
       first.medicalNotes ? `Allergies / medical: ${first.medicalNotes}` : "",
       first.goals ? `Goals: ${first.goals}` : "",
     ].filter(Boolean).join("\n");
 
     await sendEmail({
       to: coachEmail,
-      subject: `New signup: ${camperNames.join(", ")} — ${first.campTitle}`,
+      subject: `New signup: ${camperNames.join(", ")} for ${first.campTitle}`,
       text: coachText,
       html: coachText.split("\n").map((line) => `<p>${escapeForEmail(line)}</p>`).join(""),
     });
