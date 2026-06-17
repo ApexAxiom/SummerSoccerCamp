@@ -51,6 +51,22 @@ function createHttpError(message, statusCode = 500, extra = {}) {
   return error;
 }
 
+const DEFAULT_ADMIN_PIN = "363636";
+
+// The coach view is gated by a soft PIN so strangers can't add camps or read the
+// roster. ADMIN_TOKEN overrides it (set a long random value for stronger
+// protection); otherwise it falls back to the default PIN, so the coach view is
+// never left wide open.
+function adminCredential() {
+  return process.env.ADMIN_TOKEN || DEFAULT_ADMIN_PIN;
+}
+
+function checkAdminToken(token) {
+  const provided = Buffer.from(String(token || ""));
+  const configured = Buffer.from(adminCredential());
+  return provided.length === configured.length && crypto.timingSafeEqual(provided, configured);
+}
+
 function serviceFor(id) {
   return SERVICES.find((service) => service.id === id);
 }
@@ -439,6 +455,9 @@ module.exports = {
   DEFAULT_CAMP_COLOR,
   ACTIVE_REGISTRATION_STATUSES,
   createHttpError,
+  DEFAULT_ADMIN_PIN,
+  adminCredential,
+  checkAdminToken,
   serviceFor,
   text,
   isDateString,

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Coach View | Noah Soccer Training</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/styles.css?v=20260618d">
+  <link rel="stylesheet" href="/styles.css?v=20260619a">
 </head>
 <body>
   <header class="topbar">
@@ -33,11 +33,11 @@
 
     <form id="admin-login" class="admin-login">
       <label>
-        <span>Admin token</span>
-        <input name="token" type="password" autocomplete="off" required>
+        <span>Coach PIN</span>
+        <input name="token" type="password" inputmode="numeric" autocomplete="off" placeholder="Enter your PIN" required>
       </label>
-      <button class="button primary full" type="submit">View registrations</button>
-      <p class="muted small">Use the `ADMIN_TOKEN` from the server environment. It is never stored on the server by this page.</p>
+      <button class="button primary full" type="submit">Open coach view</button>
+      <p class="muted small">Enter the coach PIN to manage camps and see who's signed up.</p>
     </form>
 
     <div id="admin-message" class="form-message" role="alert" hidden></div>
@@ -149,6 +149,6 @@
     </div>
   </main>
 
-  <script src="/admin.js?v=20260618d"></script>
+  <script src="/admin.js?v=20260619a"></script>
 </body>
 </html>

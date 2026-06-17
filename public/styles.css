@@ -908,6 +908,10 @@ textarea:focus {
   gap: 26px;
 }
 
+.admin-content[hidden] {
+  display: none;
+}
+
 .camp-form {
   background: var(--white);
   border: 1px solid var(--line);
@@ -1038,6 +1042,40 @@ textarea:focus {
   border-left: 0;
   border-radius: 0;
   box-shadow: none;
+}
+
+.camp-message {
+  background: var(--surface-2);
+  border-top: 1px solid var(--hairline);
+  display: grid;
+  gap: 12px;
+  padding: 18px 22px;
+}
+
+.camp-message label {
+  display: block;
+  margin: 0;
+}
+
+.camp-message label > span {
+  color: var(--muted);
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.msg-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.msg-status {
+  color: var(--muted);
 }
 
 .wide {

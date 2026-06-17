@@ -1,4 +1,3 @@
-const crypto = require("crypto");
 const fsSync = require("fs");
 const fs = require("fs/promises");
 const http = require("http");
@@ -18,9 +17,11 @@ const {
   createRegistrationId,
   createGroupId,
   createHttpError,
+  checkAdminToken,
+  text,
 } = require("./shared/core");
 const { createStripeCheckoutSession, verifyStripeSignature, sessionGroupId } = require("./shared/stripe");
-const { sendSignupEmails } = require("./shared/email");
+const { sendSignupEmails, sendCampMessage } = require("./shared/email");
 
 const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, "public");
@@ -355,23 +356,14 @@ async function handleSessionStatus(url, res) {
 }
 
 function authorized(req) {
-  const configured = process.env.ADMIN_TOKEN;
-  if (!configured) return false;
   const header = req.headers.authorization || "";
   const token = header.startsWith("Bearer ") ? header.slice("Bearer ".length) : "";
-  const configuredBuffer = Buffer.from(configured);
-  const tokenBuffer = Buffer.from(token);
-  return tokenBuffer.length === configuredBuffer.length && crypto.timingSafeEqual(tokenBuffer, configuredBuffer);
+  return checkAdminToken(token);
 }
 
 function requireAdmin(req, res) {
-  if (!process.env.ADMIN_TOKEN) {
-    sendJson(res, 503, { error: "Admin view is not configured.", missingEnv: ["ADMIN_TOKEN"] });
-    return false;
-  }
-
   if (!authorized(req)) {
-    sendJson(res, 401, { error: "Unauthorized." });
+    sendJson(res, 401, { error: "Wrong PIN." });
     return false;
   }
 
@@ -433,6 +425,39 @@ async function handleAdminRegistrations(req, res) {
   const registrations = await readRegistrations();
   const sorted = registrations.slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   sendJson(res, 200, { registrations: sorted });
+}
+
+async function handleAdminCampMessage(req, res, campId) {
+  if (!requireAdmin(req, res)) return;
+
+  const input = await readJson(req);
+  const subject = text(input.subject, 150);
+  const messageBody = text(input.message, 2000);
+  if (!subject || !messageBody) {
+    throw createHttpError("Add a subject and a message.", 400);
+  }
+
+  const camps = await readCamps();
+  const camp = camps.find((item) => item.id === campId);
+  if (!camp) {
+    sendJson(res, 404, { error: "Camp not found." });
+    return;
+  }
+
+  const registrations = await readRegistrations();
+  const parents = registrations
+    .filter((item) => item.campId === campId && item.status === "paid")
+    .map((item) => ({ name: item.parentName, email: item.parentEmail }));
+
+  const result = await sendCampMessage(camp, parents, subject, messageBody);
+  if (result.reason === "not_configured") {
+    sendJson(res, 503, {
+      error: "Email sending isn't set up yet. Add RESEND_API_KEY and MAIL_FROM in Amplify to message parents.",
+      missingEnv: ["RESEND_API_KEY", "MAIL_FROM"],
+    });
+    return;
+  }
+  sendJson(res, 200, { sent: result.sent || 0, total: result.total || 0 });
 }
 
 async function serveStatic(url, res) {
@@ -513,6 +538,12 @@ async function handleRequest(req, res) {
 
   if (req.method === "POST" && url.pathname === "/api/admin/camps") {
     await handleAdminCreateCamp(req, res);
+    return;
+  }
+
+  const campMessageMatch = url.pathname.match(/^\/api\/admin\/camps\/([^/]+)\/message$/);
+  if (req.method === "POST" && campMessageMatch) {
+    await handleAdminCampMessage(req, res, decodeURIComponent(campMessageMatch[1]));
     return;
   }
 

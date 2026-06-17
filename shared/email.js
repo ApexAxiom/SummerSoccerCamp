@@ -106,8 +106,46 @@ async function sendSignupEmails(groupRegistrations) {
   }
 }
 
+function emailConfigured() {
+  return Boolean(process.env.RESEND_API_KEY && process.env.MAIL_FROM);
+}
+
+// Sends a coach's message to each paid parent of a camp. Returns the count sent,
+// or a reason ("no_recipients" / "not_configured") so the coach view can show a
+// friendly result without anything failing loudly.
+async function sendCampMessage(camp, parents, subject, message) {
+  const recipients = Array.from(new Set((parents || []).map((p) => p.email).filter(Boolean)));
+  if (!recipients.length) return { sent: 0, reason: "no_recipients" };
+  if (!emailConfigured()) return { sent: 0, reason: "not_configured" };
+
+  const contactEmail = process.env.CONTACT_EMAIL || "";
+  const contactPhone = process.env.CONTACT_PHONE || "";
+  const contactLine = contactEmail || contactPhone
+    ? `Reach Noah at ${[contactEmail, contactPhone].filter(Boolean).join(" or ")}.`
+    : "";
+  const campLine = `Camp: ${camp.title} (${formatCampDates(camp.startDate, camp.endDate)})`;
+
+  const parts = [message, "", campLine];
+  if (contactLine) parts.push(contactLine);
+  parts.push("Noah Westra Soccer Training");
+  const text = parts.join("\n");
+  const html = `<p>${escapeForEmail(message).replace(/\n/g, "<br>")}</p>`
+    + `<p style="color:#6e6e73">${escapeForEmail(campLine)}</p>`
+    + (contactLine ? `<p style="color:#6e6e73">${escapeForEmail(contactLine)}</p>` : "")
+    + "<p>Noah Westra Soccer Training</p>";
+
+  let sent = 0;
+  for (const to of recipients) {
+    const result = await sendEmail({ to, subject, text, html });
+    if (result.sent) sent += 1;
+  }
+  return { sent, total: recipients.length };
+}
+
 module.exports = {
   sendEmail,
+  emailConfigured,
   campSummaryLines,
   sendSignupEmails,
+  sendCampMessage,
 };

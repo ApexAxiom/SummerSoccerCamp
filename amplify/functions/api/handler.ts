@@ -2,10 +2,10 @@
 // server.js, but reads/writes DynamoDB (via ../lib/store) and reuses the shared
 // business logic. Authored as an Amplify-idiomatic ESM handler; the shared and
 // store modules are CommonJS and are pulled in with namespace imports.
-import * as crypto from "crypto";
 import * as coreModule from "../../../shared/core";
 import * as stripeModule from "../../../shared/stripe";
 import * as storeModule from "../lib/store";
+import * as emailModule from "../../../shared/email";
 
 // The shared and store modules are plain CommonJS (no type declarations); their
 // logic is covered by test/logic.test.js. Alias them as any so tsc checks the
@@ -13,6 +13,7 @@ import * as storeModule from "../lib/store";
 const core: any = coreModule;
 const stripe: any = stripeModule;
 const store: any = storeModule;
+const email: any = emailModule;
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
 
@@ -40,22 +41,11 @@ function readBody(event: any) {
   }
 }
 
-function isAuthorized(event: any) {
-  const configured = process.env.ADMIN_TOKEN;
-  if (!configured) return false;
+function requireAdmin(event: any) {
   const header = (event.headers?.authorization || event.headers?.Authorization || "") as string;
   const token = header.startsWith("Bearer ") ? header.slice("Bearer ".length) : "";
-  const a = Buffer.from(token);
-  const b = Buffer.from(configured);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
-}
-
-function requireAdmin(event: any) {
-  if (!process.env.ADMIN_TOKEN) {
-    throw core.createHttpError("Admin view is not configured.", 503, { missingEnv: ["ADMIN_TOKEN"] });
-  }
-  if (!isAuthorized(event)) {
-    throw core.createHttpError("Unauthorized.", 401);
+  if (!core.checkAdminToken(token)) {
+    throw core.createHttpError("Wrong PIN.", 401);
   }
 }
 
@@ -158,6 +148,31 @@ async function handleAdminRegistrations() {
   return json(200, { registrations: regs });
 }
 
+async function handleAdminMessage(id: string, input: any) {
+  const subject = core.text(input.subject, 150);
+  const message = core.text(input.message, 2000);
+  if (!subject || !message) {
+    throw core.createHttpError("Add a subject and a message.", 400);
+  }
+
+  const camp = await store.getCamp(id);
+  if (!camp) return json(404, { error: "Camp not found." });
+
+  const rows = await store.listRegistrationsByCamp(id);
+  const parents = rows
+    .filter((r: any) => r.status === "paid")
+    .map((r: any) => ({ name: r.parentName, email: r.parentEmail }));
+
+  const result = await email.sendCampMessage(camp, parents, subject, message);
+  if (result.reason === "not_configured") {
+    return json(503, {
+      error: "Email sending isn't set up yet. Add RESEND_API_KEY and MAIL_FROM in Amplify to message parents.",
+      missingEnv: ["RESEND_API_KEY", "MAIL_FROM"],
+    });
+  }
+  return json(200, { sent: result.sent || 0, total: result.total || 0 });
+}
+
 export const handler = async (event: any) => {
   try {
     const method = event.requestContext?.http?.method || event.httpMethod || "GET";
@@ -172,6 +187,8 @@ export const handler = async (event: any) => {
 
     if (method === "GET" && path === "/admin/dashboard") { requireAdmin(event); return await handleAdminDashboard(); }
     if (method === "POST" && path === "/admin/camps") { requireAdmin(event); return await handleAdminCreateCamp(readBody(event)); }
+    const messageMatch = path.match(/^\/admin\/camps\/([^/]+)\/message$/);
+    if (method === "POST" && messageMatch) { requireAdmin(event); return await handleAdminMessage(decodeURIComponent(messageMatch[1]), readBody(event)); }
     const updateMatch = path.match(/^\/admin\/camps\/([^/]+)$/);
     if (method === "PATCH" && updateMatch) { requireAdmin(event); return await handleAdminUpdateCamp(decodeURIComponent(updateMatch[1]), readBody(event)); }
     if (method === "GET" && path === "/admin/registrations") { requireAdmin(event); return await handleAdminRegistrations(); }

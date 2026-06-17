@@ -185,13 +185,28 @@
               <span>${escapeHtml(camp.spotsLeft)} spots left</span>
               <span>${escapeHtml(counts.paid)} paid · ${escapeHtml(counts.pending)} pending</span>
               <button class="button secondary compact" type="button" data-edit-camp="${escapeHtml(camp.id)}">Edit camp</button>
-              <button class="button secondary compact" type="button" data-email-camp="${escapeHtml(camp.id)}">Email parents</button>
+              <button class="button secondary compact" type="button" data-message-camp="${escapeHtml(camp.id)}">Message parents</button>
               <button class="button secondary compact" type="button" data-toggle-status="${escapeHtml(camp.id)}">
                 ${camp.status === "open" ? "Close signup" : "Open signup"}
               </button>
               ${camp.status === "archived"
                 ? '<button class="button secondary compact" type="button" data-restore-camp="' + escapeHtml(camp.id) + '">Restore closed</button>'
                 : '<button class="button secondary compact danger" type="button" data-archive-camp="' + escapeHtml(camp.id) + '">Archive</button>'}
+            </div>
+          </div>
+          <div class="camp-message" data-message-for="${escapeHtml(camp.id)}" hidden>
+            <label>
+              <span>Subject</span>
+              <input class="msg-subject" type="text" maxlength="150" placeholder="Update about ${escapeHtml(camp.title)}">
+            </label>
+            <label>
+              <span>Message to parents</span>
+              <textarea class="msg-body" rows="4" maxlength="2000" placeholder="Hi! A quick note about this week..."></textarea>
+            </label>
+            <div class="msg-actions">
+              <button class="button primary compact msg-send" type="button">Send to parents</button>
+              <button class="button secondary compact msg-cancel" type="button">Cancel</button>
+              <span class="msg-status muted small"></span>
             </div>
           </div>
           ${renderRoster(roster)}
@@ -226,26 +241,58 @@
       });
     });
 
-    dashboard.querySelectorAll("[data-email-camp]").forEach((button) => {
+    dashboard.querySelectorAll("[data-message-camp]").forEach((button) => {
       button.addEventListener("click", () => {
-        const camp = latestCamps.find((item) => item.id === button.dataset.emailCamp);
-        if (camp) emailParents(camp);
+        const card = button.closest(".camp-admin-card");
+        const panel = card && card.querySelector(".camp-message");
+        if (!panel) return;
+        panel.hidden = !panel.hidden;
+        if (!panel.hidden) panel.querySelector(".msg-subject").focus();
       });
+    });
+
+    dashboard.querySelectorAll(".camp-message").forEach((panel) => {
+      const campId = panel.dataset.messageFor;
+      const cancel = panel.querySelector(".msg-cancel");
+      const send = panel.querySelector(".msg-send");
+      if (cancel) cancel.addEventListener("click", () => { panel.hidden = true; });
+      if (send) send.addEventListener("click", () => sendCampMessage(campId, panel));
     });
   }
 
-  function activeRoster(camp) {
-    return (camp.roster || []).filter((item) => item.status !== "expired" && item.status !== "checkout_failed");
-  }
-
-  function emailParents(camp) {
-    const emails = Array.from(new Set(activeRoster(camp).map((item) => item.parentEmail).filter(Boolean)));
-    if (!emails.length) {
-      setMessage("No parents to email for this camp yet.", "info");
+  async function sendCampMessage(campId, panel) {
+    const subject = panel.querySelector(".msg-subject").value.trim();
+    const body = panel.querySelector(".msg-body").value.trim();
+    const statusEl = panel.querySelector(".msg-status");
+    const sendBtn = panel.querySelector(".msg-send");
+    if (!subject || !body) {
+      statusEl.textContent = "Add a subject and a message first.";
       return;
     }
-    const subject = `${camp.title} (${campDateRange(camp)})`;
-    window.location.href = `mailto:?bcc=${encodeURIComponent(emails.join(","))}&subject=${encodeURIComponent(subject)}`;
+    sendBtn.disabled = true;
+    statusEl.textContent = "Sending...";
+    try {
+      await apiReady;
+      const response = await fetch(apiUrl(`/admin/camps/${encodeURIComponent(campId)}/message`), {
+        method: "POST",
+        headers: { ...authHeaders(), "content-type": "application/json" },
+        body: JSON.stringify({ subject, message: body }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Could not send the message.");
+      if (result.sent > 0) {
+        statusEl.textContent = `Sent to ${result.sent} parent${result.sent === 1 ? "" : "s"}.`;
+        panel.querySelector(".msg-body").value = "";
+      } else if (result.total > 0) {
+        statusEl.textContent = "Couldn't send right now. Please try again.";
+      } else {
+        statusEl.textContent = "No paid parents to message yet.";
+      }
+    } catch (error) {
+      statusEl.textContent = error.message;
+    } finally {
+      sendBtn.disabled = false;
+    }
   }
 
   function renderRoster(roster) {
