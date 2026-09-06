@@ -1,0 +1,64 @@
+name: Deploy static frontend to Cloudflare
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: noahscompany-static-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: Production
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+        with:
+          node-version: '22'
+      - name: Check the existing dependency-free frontend and logic
+        run: |
+          npm run check
+          npm test
+      - name: Restore the existing public backend configuration
+        env:
+          AMPLIFY_OUTPUTS_JSON: ${{ vars.AMPLIFY_OUTPUTS_JSON }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { writeFile } from 'node:fs/promises';
+          const raw = process.env.AMPLIFY_OUTPUTS_JSON || '';
+          const outputs = JSON.parse(raw);
+          assert.deepEqual(Object.keys(outputs).sort(), ['custom', 'version']);
+          assert.deepEqual(Object.keys(outputs.custom), ['apiUrl']);
+          const endpoint = new URL(outputs.custom.apiUrl);
+          assert.equal(endpoint.protocol, 'https:');
+          assert.equal(endpoint.username + endpoint.password, '');
+          assert.match(endpoint.hostname, /\.lambda-url\.[a-z0-9-]+\.on\.aws$/);
+          await writeFile('public/amplify_outputs.json', raw);
+          console.log('Existing public Lambda URL configuration restored without a backend deployment.');
+          NODE
+          test -s public/index.html
+          test ! -e public/404.html
+          test ! -e public/_redirects
+          test ! -e public/_worker.js
+      - name: Upload the existing public directory
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          npx --yes wrangler@4.129.0 pages deploy public \
+            --project-name noahscompany \
+            --branch main \
+            --commit-hash "$GITHUB_SHA" \
+            --commit-dirty=false
