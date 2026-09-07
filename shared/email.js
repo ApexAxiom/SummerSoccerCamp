@@ -7,14 +7,13 @@
 
 const { formatCampDates, escapeForEmail } = require("./core");
 
-async function sendEmail({ to, subject, text, html }) {
+async function sendEmail({ to, subject, text, html, idempotencyKey }, env = process.env) {
   const recipients = (Array.isArray(to) ? to : [to]).filter(Boolean);
   if (!recipients.length) return { sent: false, reason: "no_recipient" };
 
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.MAIL_FROM;
+  const apiKey = env.RESEND_API_KEY;
+  const from = env.MAIL_FROM;
   if (!apiKey || !from) {
-    console.log(`[email skipped] to=${recipients.join(", ")} subject="${subject}" (set RESEND_API_KEY and MAIL_FROM to send)`);
     return { sent: false, reason: "not_configured" };
   }
 
@@ -24,17 +23,17 @@ async function sendEmail({ to, subject, text, html }) {
       headers: {
         authorization: `Bearer ${apiKey}`,
         "content-type": "application/json",
+        ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {}),
       },
       body: JSON.stringify({ from, to: recipients, subject, text, html }),
+      signal: AbortSignal.timeout(15000),
     });
     if (!response.ok) {
-      const body = await response.text();
-      console.error(`[email failed] ${response.status} ${body}`);
-      return { sent: false, reason: "api_error" };
+      return { sent: false, reason: `provider_${response.status}` };
     }
-    return { sent: true };
+    const body = await response.json();
+    return { sent: true, id: body.id || null };
   } catch (error) {
-    console.error(`[email error] ${error.message}`);
     return { sent: false, reason: "exception" };
   }
 }
@@ -52,11 +51,12 @@ function campSummaryLines(registration) {
   return lines;
 }
 
-async function sendSignupEmails(groupRegistrations) {
-  if (!groupRegistrations.length) return;
-  const contactEmail = process.env.CONTACT_EMAIL || "";
-  const contactPhone = process.env.CONTACT_PHONE || "";
-  const coachEmail = process.env.COACH_EMAIL || contactEmail;
+function signupMessages(groupRegistrations, env = process.env) {
+  if (!groupRegistrations.length) return [];
+  const messages = [];
+  const contactEmail = env.CONTACT_EMAIL || "";
+  const contactPhone = env.CONTACT_PHONE || "";
+  const coachEmail = env.COACH_EMAIL || contactEmail;
   const first = groupRegistrations[0];
   const camperNames = groupRegistrations.map((item) => item.camperName);
   const summary = campSummaryLines(first);
@@ -75,7 +75,8 @@ async function sendSignupEmails(groupRegistrations) {
     "See you on the field!",
   ].filter((line) => line !== null).join("\n");
 
-  await sendEmail({
+  messages.push({
+    kind: "parent",
     to: first.parentEmail,
     subject: `You're signed up: ${first.campTitle}`,
     text: parentText,
@@ -97,29 +98,35 @@ async function sendSignupEmails(groupRegistrations) {
       first.goals ? `Goals: ${first.goals}` : "",
     ].filter(Boolean).join("\n");
 
-    await sendEmail({
+    messages.push({
+      kind: "coach",
       to: coachEmail,
       subject: `New signup: ${camperNames.join(", ")} for ${first.campTitle}`,
       text: coachText,
       html: coachText.split("\n").map((line) => `<p>${escapeForEmail(line)}</p>`).join(""),
     });
   }
+  return messages;
 }
 
-function emailConfigured() {
-  return Boolean(process.env.RESEND_API_KEY && process.env.MAIL_FROM);
+async function sendSignupEmails(groupRegistrations, env = process.env) {
+  for (const message of signupMessages(groupRegistrations, env)) await sendEmail(message, env);
+}
+
+function emailConfigured(env = process.env) {
+  return Boolean(env.RESEND_API_KEY && env.MAIL_FROM);
 }
 
 // Sends a coach's message to each paid parent of a camp. Returns the count sent,
 // or a reason ("no_recipients" / "not_configured") so the coach view can show a
 // friendly result without anything failing loudly.
-async function sendCampMessage(camp, parents, subject, message) {
+async function sendCampMessage(camp, parents, subject, message, env = process.env) {
   const recipients = Array.from(new Set((parents || []).map((p) => p.email).filter(Boolean)));
   if (!recipients.length) return { sent: 0, reason: "no_recipients" };
-  if (!emailConfigured()) return { sent: 0, reason: "not_configured" };
+  if (!emailConfigured(env)) return { sent: 0, reason: "not_configured" };
 
-  const contactEmail = process.env.CONTACT_EMAIL || "";
-  const contactPhone = process.env.CONTACT_PHONE || "";
+  const contactEmail = env.CONTACT_EMAIL || "";
+  const contactPhone = env.CONTACT_PHONE || "";
   const contactLine = contactEmail || contactPhone
     ? `Reach Noah at ${[contactEmail, contactPhone].filter(Boolean).join(" or ")}.`
     : "";
@@ -136,7 +143,7 @@ async function sendCampMessage(camp, parents, subject, message) {
 
   let sent = 0;
   for (const to of recipients) {
-    const result = await sendEmail({ to, subject, text, html });
+    const result = await sendEmail({ to, subject, text, html }, env);
     if (result.sent) sent += 1;
   }
   return { sent, total: recipients.length };
@@ -147,5 +154,6 @@ module.exports = {
   emailConfigured,
   campSummaryLines,
   sendSignupEmails,
+  signupMessages,
   sendCampMessage,
 };

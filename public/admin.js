@@ -75,6 +75,7 @@
 
   function statusLabel(status) {
     if (status === "paid") return "Paid";
+    if (status === "payment_review") return "Paid — capacity review";
     if (status === "checkout_started") return "Checkout started";
     if (status === "checkout_failed") return "Checkout failed";
     if (status === "expired") return "Expired";
@@ -337,6 +338,13 @@
       login.hidden = true;
       adminContent.hidden = false;
       render(body.camps || []);
+      const delivery = body.delivery || {};
+      const notices = [];
+      if (delivery.paymentReview) notices.push(`${delivery.paymentReview} paid signup(s) need a capacity review.`);
+      if (delivery.checkoutReview) notices.push(`${delivery.checkoutReview} checkout(s) need Stripe reconciliation before their reserved spots can be released.`);
+      if (delivery.emailUnknown) notices.push(`${delivery.emailUnknown} confirmation email(s) need delivery verification before resending.`);
+      if (delivery.emailPending) notices.push(`${delivery.emailPending} confirmation email(s) are awaiting delivery.`);
+      if (notices.length) setMessage(notices.join(" "), "error");
     } catch (error) {
       dashboard.innerHTML = "";
       adminContent.hidden = true;
