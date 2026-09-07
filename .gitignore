@@ -12,5 +12,9 @@ screenshots/
 amplify_outputs.json
 amplify_outputs.*
 public/amplify_outputs.json
+.wrangler/
+cloudflare/dist/
+cloudflare/release-config.json
+cloudflare/.dev.vars*
 .npm/
 amplifyconfiguration*

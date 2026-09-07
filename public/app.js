@@ -588,7 +588,17 @@
         successState.innerHTML = [
           '<p class="section-kicker">You\'re in!</p>',
           `<h1>${escapeHtml(playersHeadline(status))}</h1>`,
-          '<p class="muted">Your payment went through and a confirmation email is on its way. See you on the field!</p>',
+          '<p class="muted">Your payment went through and your spot is confirmed. See you on the field!</p>',
+          successDetails(status),
+        ].join("");
+        return;
+      }
+
+      if (response.ok && status.status === "payment_review") {
+        successState.innerHTML = [
+          '<p class="section-kicker">Contact Noah</p>',
+          '<h1>Your payment needs a signup review.</h1>',
+          '<p class="muted">We received payment after the reservation expired, and the camp is now full. Keep your Stripe receipt and contact Noah before starting another signup.</p>',
           successDetails(status),
         ].join("");
         return;
@@ -597,7 +607,7 @@
       successState.innerHTML = [
         '<p class="section-kicker">Almost there</p>',
         "<h1>Confirming your spot…</h1>",
-        '<p class="muted">Your payment went through, and we\'re just wrapping up. This page will update in a few seconds.</p>',
+        '<p class="muted">We are waiting for payment confirmation. Refresh this page shortly, or contact Noah with your Stripe receipt if the signup remains unconfirmed.</p>',
         successDetails(status),
       ].join("");
     } catch (error) {

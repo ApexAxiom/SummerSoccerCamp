@@ -61,9 +61,10 @@ function adminCredential() {
   return process.env.ADMIN_TOKEN || DEFAULT_ADMIN_PIN;
 }
 
-function checkAdminToken(token) {
+function checkAdminToken(token, env = process.env) {
   const provided = Buffer.from(String(token || ""));
-  const configured = Buffer.from(adminCredential());
+  const configured = Buffer.from(env.ADMIN_TOKEN || (env === process.env ? adminCredential() : ""));
+  if (!configured.length) return false;
   return provided.length === configured.length && crypto.timingSafeEqual(provided, configured);
 }
 
@@ -119,39 +120,39 @@ function createGroupId() {
   return `grp_${Date.now().toString(36)}_${crypto.randomBytes(5).toString("hex")}`;
 }
 
-function stripeConfiguredFor(service) {
-  return Boolean(process.env.STRIPE_SECRET_KEY && process.env[service.priceEnv]);
+function stripeConfiguredFor(service, env = process.env) {
+  return Boolean(env.STRIPE_SECRET_KEY && env[service.priceEnv]);
 }
 
-function serviceConfig(service) {
+function serviceConfig(service, env = process.env) {
   return {
     id: service.id,
     name: service.name,
     description: service.description,
-    displayPrice: process.env[service.displayPriceEnv] || "",
-    checkoutEnabled: stripeConfiguredFor(service),
+    displayPrice: env[service.displayPriceEnv] || "",
+    checkoutEnabled: stripeConfiguredFor(service, env),
     missingEnv: [
-      !process.env.STRIPE_SECRET_KEY ? "STRIPE_SECRET_KEY" : null,
-      !process.env[service.priceEnv] ? service.priceEnv : null,
+      !env.STRIPE_SECRET_KEY ? "STRIPE_SECRET_KEY" : null,
+      !env[service.priceEnv] ? service.priceEnv : null,
     ].filter(Boolean),
   };
 }
 
-function publicConfig() {
+function publicConfig(env = process.env) {
   return {
-    appUrl: process.env.APP_URL || "",
-    services: SERVICES.map(serviceConfig),
-    webhookConfigured: Boolean(process.env.STRIPE_WEBHOOK_SECRET),
-    adminConfigured: Boolean(process.env.ADMIN_TOKEN),
-    contactEmail: process.env.CONTACT_EMAIL || "",
-    contactPhone: process.env.CONTACT_PHONE || "",
+    appUrl: env.APP_URL || "",
+    services: SERVICES.map(service => serviceConfig(service, env)),
+    webhookConfigured: Boolean(env.STRIPE_WEBHOOK_SECRET),
+    adminConfigured: Boolean(env.ADMIN_TOKEN),
+    contactEmail: env.CONTACT_EMAIL || "",
+    contactPhone: env.CONTACT_PHONE || "",
   };
 }
 
-function requireStripeConfig(service) {
-  const priceId = process.env[service.priceEnv];
+function requireStripeConfig(service, env = process.env) {
+  const priceId = env[service.priceEnv];
   const missingEnv = [
-    !process.env.STRIPE_SECRET_KEY ? "STRIPE_SECRET_KEY" : null,
+    !env.STRIPE_SECRET_KEY ? "STRIPE_SECRET_KEY" : null,
     !priceId ? service.priceEnv : null,
   ].filter(Boolean);
 

@@ -1,0 +1,21 @@
+name: Check Cloudflare backend
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+      - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f
+        with:
+          node-version: '22'
+      - run: npm run check && npm test
+      - run: npm ci --prefix cloudflare --ignore-scripts --no-audit --no-fund
+      - run: npm --prefix cloudflare run check && npm --prefix cloudflare run build && npm --prefix cloudflare test
+        env:
+          WRANGLER_SEND_METRICS: 'false'

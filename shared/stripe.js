@@ -8,10 +8,10 @@
 const crypto = require("crypto");
 const { createHttpError, requireStripeConfig } = require("./core");
 
-async function createStripeCheckoutSession(group, service, camp) {
-  const priceId = requireStripeConfig(service);
+async function createStripeCheckoutSession(group, service, camp, env = process.env) {
+  const priceId = requireStripeConfig(service, env);
   const quantity = String(group.registrations.length);
-  const appUrl = process.env.APP_URL || "";
+  const appUrl = env.APP_URL || "";
 
   const params = new URLSearchParams();
   params.set("mode", "payment");
@@ -31,10 +31,12 @@ async function createStripeCheckoutSession(group, service, camp) {
   const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
     method: "POST",
     headers: {
-      authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,
+      authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
       "content-type": "application/x-www-form-urlencoded",
+      "idempotency-key": `noah-checkout-${group.id}`,
     },
     body: params.toString(),
+    signal: AbortSignal.timeout(15000),
   });
 
   const bodyText = await response.text();
@@ -48,6 +50,7 @@ async function createStripeCheckoutSession(group, service, camp) {
   if (!response.ok) {
     throw createHttpError(body.error?.message || "Stripe refused the checkout session.", 502, {
       stripe: body.error || body,
+      retryable: response.status === 429 || response.status >= 500,
     });
   }
 
@@ -69,8 +72,8 @@ function parseStripeSignature(header) {
 // Verifies Stripe's signature over the exact raw request bytes. rawBody must be a
 // Buffer of the unparsed body; re-serializing the JSON would change the bytes
 // and break verification.
-function verifyStripeSignature(rawBody, signatureHeader) {
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+function verifyStripeSignature(rawBody, signatureHeader, env = process.env) {
+  const secret = env.STRIPE_WEBHOOK_SECRET;
   if (!secret) {
     throw createHttpError("Stripe webhook secret is not configured.", 503, {
       missingEnv: ["STRIPE_WEBHOOK_SECRET"],

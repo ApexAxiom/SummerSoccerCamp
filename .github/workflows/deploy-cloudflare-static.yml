@@ -41,9 +41,9 @@ jobs:
           const endpoint = new URL(outputs.custom.apiUrl);
           assert.equal(endpoint.protocol, 'https:');
           assert.equal(endpoint.username + endpoint.password, '');
-          assert.match(endpoint.hostname, /\.lambda-url\.[a-z0-9-]+\.on\.aws$/);
+          assert.ok(endpoint.hostname === 'api.noahscompany.com' || /\.lambda-url\.[a-z0-9-]+\.on\.aws$/.test(endpoint.hostname));
           await writeFile('public/amplify_outputs.json', raw);
-          console.log('Existing public Lambda URL configuration restored without a backend deployment.');
+          console.log('Configured public API endpoint restored without a backend deployment.');
           NODE
           test -s public/index.html
           test ! -e public/404.html
