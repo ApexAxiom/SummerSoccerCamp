@@ -296,6 +296,10 @@ test('coach message uses only distinct paid parents and reports provider accepta
   await sendEvent(session);await mailSettled();mailCalls=[];
   const response=await request(`/admin/camps/${camp.id}/message`,{method:'POST',admin:true,body:{subject:'Local schedule update',message:'Local test only'}});
   assert.deepEqual(await response.json(),{sent:1,total:1});assert.equal(mailCalls.length,1);assert.deepEqual(mailCalls[0].body.to,['parent@example.invalid']);
+  const ambiguous=await worker.fetch(new Request(`https://local.invalid/admin/camps/${camp.id}/message`,{method:'POST',headers:{authorization:`Bearer ${env.ADMIN_TOKEN}`,'content-type':'application/json'},body:JSON.stringify({subject:'Local update',message:'Local uncertainty test'})}),
+    {...env,DB:db,EMAIL_TRANSPORT:'cloudflare',EMAIL_ENABLED:'true',EMAIL:{async send(){throw new Error('Unknown acceptance');}}},{});
+  assert.equal(ambiguous.status,200);
+  assert.deepEqual(await ambiguous.json(),{sent:0,total:1,uncertain:1});
 });
 test('historical pending checkout is retained for reconciliation and never recreated',async()=>{
   await reset();

@@ -199,7 +199,7 @@ async function route(request, env, ctx) {
     const parents = (await store.listRegistrationsByCamp(camp.id)).filter(row => row.status === 'paid').map(row => ({ email: row.parentEmail }));
     const result = await email.sendCampMessage(camp, parents, subject, message, env);
     if (result.reason === 'not_configured') return json({ error: 'Email sending is not configured.' }, 503);
-    return json({ sent: result.sent || 0, total: result.total || 0 });
+    return json({ sent: result.sent || 0, total: result.total || 0, ...(result.uncertain ? {uncertain:result.uncertain} : {}) });
   }
   return json({ error: 'Method not allowed.' }, 405);
 }
