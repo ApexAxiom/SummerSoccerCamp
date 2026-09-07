@@ -50,7 +50,8 @@ async function createStripeCheckoutSession(group, service, camp, env = process.e
   if (!response.ok) {
     throw createHttpError(body.error?.message || "Stripe refused the checkout session.", 502, {
       stripe: body.error || body,
-      retryable: response.status === 429 || response.status >= 500,
+      retryable: response.status === 409 || response.status === 429 || response.status >= 500
+        || body.error?.code === "idempotency_key_in_use",
     });
   }
 

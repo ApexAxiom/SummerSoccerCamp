@@ -15,6 +15,7 @@ const { Miniflare, convertV4MiniflareOptions } = createRequire(require.resolve('
 const camp = { id:'camp_local', title:'Local acceptance camp', trainingType:'group', startDate:'2026-06-15', endDate:'2026-06-18', startTime:'9:00 AM', endTime:'11:00 AM', location:'Local test field', ageMin:5, ageMax:12, capacity:2, notes:'Local fixtures only', status:'open', color:'green', createdAt:'2026-01-01T00:00:00.000Z', updatedAt:'2026-01-01T00:00:00.000Z' };
 const env = { BACKEND_ENABLED:'true', ADMIN_TOKEN:'local-test-admin-only', STRIPE_SECRET_KEY:'sk_test_local_only', STRIPE_WEBHOOK_SECRET:'whsec_local_only', STRIPE_GROUP_PRICE_ID:'price_test_group', RESEND_API_KEY:'re_test_only', MAIL_FROM:'Local <local@example.invalid>', COACH_EMAIL:'coach@example.invalid', APP_URL:'https://www.noahscompany.com', ALLOWED_ORIGINS:'https://noahscompany.com,https://www.noahscompany.com' };
 let mf, db, sessionSequence = 0, mailCalls = [], createCalls = [], failCreate = false, failMail = false;
+let createBarrier = null, conflictCreate = false;
 const sessions = new Map();
 async function provider(request) {
   const url = new URL(request.url);
@@ -22,6 +23,12 @@ async function provider(request) {
     const params = new URLSearchParams(await request.text());
     const key = request.headers.get('idempotency-key');
     createCalls.push({key,params});
+    if (conflictCreate) return Response.json({error:{message:'Request is still running',type:'invalid_request_error',code:'idempotency_key_in_use'}},{status:409});
+    if (createBarrier) {
+      const barrier=createBarrier;createBarrier=null;
+      barrier.started();
+      await barrier.released;
+    }
     if (failCreate) return Response.json({error:{message:'temporary',type:'api_error'}},{status:503});
     let session = [...sessions.values()].find(value => value.key === key);
     if (!session) {
@@ -51,7 +58,7 @@ before(async () => {
 after(async () => { await mf?.dispose(); });
 
 async function reset(capacity = 2) {
-  failCreate=false; failMail=false; mailCalls=[]; createCalls=[]; sessions.clear();
+  failCreate=false; failMail=false; createBarrier=null; conflictCreate=false; mailCalls=[]; createCalls=[]; sessions.clear();
   await db.exec('DELETE FROM email_deliveries; DELETE FROM webhook_receipts; DELETE FROM registrations; DELETE FROM signup_groups; DELETE FROM camps;');
   await db.prepare('INSERT INTO camps(id,capacity,status,payload) VALUES(?,?,?,?)').bind(camp.id,capacity,'open',JSON.stringify({...camp,capacity})).run();
 }
@@ -199,6 +206,34 @@ test('ambiguous Stripe failure preserves reservation and stable idempotency key'
   assert.equal((await db.prepare('SELECT status FROM signup_groups').first()).status,'checkout_started');
   assert.equal(createCalls[1].key,createCalls[0].key);
   assert.equal(createCalls[1].params.get('line_items[0][price]'),'price_test_group');
+
+  // A second create can conflict while Stripe is still processing the original.
+  // Its 409 is not proof that the original checkout failed or its seat is free.
+  await reset(1);
+  let releaseCreate, notifyStarted;
+  const started=new Promise(resolve=>{notifyStarted=resolve;});
+  createBarrier={started:notifyStarted,released:new Promise(resolve=>{releaseCreate=resolve;})};
+  const originalCheckout=checkout();
+  try {
+    await started;
+    const pending=await db.prepare('SELECT * FROM signup_groups').first();
+    await db.prepare('UPDATE signup_groups SET created_at=? WHERE id=?').bind(new Date(Date.now()-240000).toISOString(),pending.id).run();
+    conflictCreate=true;
+    await withLocalProvider(()=>worker.scheduled({}, {...env,DB:db}));
+    assert.equal((await db.prepare('SELECT status FROM signup_groups').first()).status,'pending_checkout');
+    assert.equal((await (await request('/camps')).json()).camps[0].spotsLeft,0);
+    assert.equal((await checkout()).status,400);
+    assert.equal(createCalls[1].key,createCalls[0].key);
+  } finally {
+    conflictCreate=false;
+    releaseCreate();
+    await originalCheckout;
+  }
+  assert.equal((await originalCheckout).status,200);
+  const recovered=await db.prepare('SELECT * FROM signup_groups').first();
+  assert.equal(recovered.status,'checkout_started');
+  assert.equal(recovered.stripe_session_id,[...sessions.values()][0].id);
+  assert.equal((await (await request('/camps')).json()).camps[0].spotsLeft,0);
 });
 test('mail failure preserves paid status and durable retry evidence',async()=>{
   await reset();await checkout();failMail=true;const session=[...sessions.values()][0];session.status='complete';session.payment_status='paid';

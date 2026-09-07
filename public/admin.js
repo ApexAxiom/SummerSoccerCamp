@@ -75,6 +75,7 @@
 
   function statusLabel(status) {
     if (status === "paid") return "Paid";
+    if (status === "payment_review") return "Paid — capacity review";
     if (status === "checkout_started") return "Checkout started";
     if (status === "checkout_failed") return "Checkout failed";
     if (status === "expired") return "Expired";
