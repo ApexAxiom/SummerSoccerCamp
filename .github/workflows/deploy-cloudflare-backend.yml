@@ -40,7 +40,7 @@ jobs:
           const allowed=new Set(['STRIPE_GROUP_PRICE_ID','STRIPE_PRIVATE_PRICE_ID','CONTACT_EMAIL','CONTACT_PHONE','COACH_EMAIL','MAIL_FROM','GROUP_DISPLAY_PRICE','PRIVATE_DISPLAY_PRICE']);
           for(const [key,value] of Object.entries(values)) { assert.ok(allowed.has(key)); assert.equal(typeof value,'string'); }
           config.d1_databases[0].database_id=id;
-          config.vars={...config.vars,...values,BACKEND_ENABLED:enabled};
+          config.vars={...config.vars,...values,BACKEND_ENABLED:enabled,SOURCE_SHA:process.env.GITHUB_SHA};
           config.routes=[{pattern:'api.noahscompany.com',custom_domain:true}];
           if(enabled==='true') config.triggers={crons:['*/5 * * * *']};
           writeFileSync('cloudflare/release-config.json',JSON.stringify(config));

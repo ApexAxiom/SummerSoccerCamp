@@ -126,7 +126,7 @@ async function route(request, env, ctx) {
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/{2,}/g, '/').replace(/\/+$/, '') || '/';
   const method = request.method;
-  if (method === 'GET' && (path === '/' || path === '/health')) return json({ ok: true, backend: 'cloudflare', enabled: env.BACKEND_ENABLED === 'true' });
+  if (method === 'GET' && (path === '/' || path === '/health')) return json({ ok: true, backend: 'cloudflare', enabled: env.BACKEND_ENABLED === 'true', sourceSha: env.SOURCE_SHA || null });
   // The draft can be deployed inert. Neither reads nor callbacks can seed,
   // import, send mail, reserve seats, or alter payment state before cutover.
   if (env.BACKEND_ENABLED !== 'true') throw unavailable();

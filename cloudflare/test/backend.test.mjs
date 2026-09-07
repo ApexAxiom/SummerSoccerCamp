@@ -305,7 +305,9 @@ test('private snapshot SQL restores closed camps and every paid registration fie
 test('disabled Worker has no camp, checkout, webhook, or admin mutation path',async()=>{
   const disabled = new Miniflare(convertV4MiniflareOptions({modules:true,script:readFileSync(new URL('../dist/worker.js',import.meta.url),'utf8'),compatibilityDate:'2026-09-06',compatibilityFlags:['nodejs_compat'],bindings:{...env,BACKEND_ENABLED:'false'},d1Databases:{DB:'inert-local-test'},outboundService:()=>{throw new Error('Inert backend made an outbound call.');}}));
   try {
-    assert.equal((await disabled.dispatchFetch('https://local.invalid/health')).status,200);
+    const health=await disabled.dispatchFetch('https://local.invalid/health');
+    assert.equal(health.status,200);
+    assert.deepEqual(await health.json(),{ok:true,backend:'cloudflare',enabled:false,sourceSha:null});
     for(const [path,method] of [['/camps','GET'],['/create-checkout-session','POST'],['/stripe/webhook','POST'],['/admin/dashboard','GET']]) assert.equal((await disabled.dispatchFetch(`https://local.invalid${path}`,{method})).status,503);
   } finally {await disabled.dispose();}
 });
