@@ -1,9 +1,7 @@
 "use strict";
 
-// Email notifications shared by the local server and the Lambda functions.
-// Sends through Resend's HTTP API when RESEND_API_KEY and MAIL_FROM are set, and
-// otherwise logs and returns without throwing, so a missing email key never
-// blocks a real payment from being recorded.
+// Existing local/AWS consumers use Resend. The Cloudflare Worker explicitly
+// selects its native binding. Missing mail never prevents recording payment.
 
 const { formatCampDates, escapeForEmail } = require("./core");
 
@@ -13,6 +11,22 @@ async function sendEmail({ to, subject, text, html, idempotencyKey }, env = proc
 
   const apiKey = env.RESEND_API_KEY;
   const from = env.MAIL_FROM;
+  if (env.EMAIL_TRANSPORT === 'cloudflare') {
+    if (!emailConfigured(env)) return { sent:false, reason:'not_configured' };
+    try {
+      const result = await env.EMAIL.send({ from, to:recipients, subject, text, html,
+        ...(env.CONTACT_EMAIL ? {replyTo:env.CONTACT_EMAIL} : {}) });
+      // Cloudflare documents acceptance IDs, not idempotent sends. Never assume
+      // a custom header or a missing response permits a second attempt.
+      return result?.messageId ? {sent:true,id:result.messageId} : {sent:false,reason:'provider_result_unknown',uncertain:true};
+    } catch (error) {
+      const rejected = new Set(['E_RATE_LIMIT_EXCEEDED','E_DAILY_LIMIT_EXCEEDED','E_SENDER_NOT_VERIFIED',
+        'E_SENDER_DOMAIN_NOT_AVAILABLE','E_RECIPIENT_NOT_ALLOWED','E_VALIDATION_ERROR','E_FIELD_MISSING',
+        'E_TOO_MANY_RECIPIENTS','E_CONTENT_TOO_LARGE','E_RECIPIENT_SUPPRESSED']);
+      const explicitRejection = rejected.has(error?.code);
+      return {sent:false,reason:explicitRejection ? error.code : 'provider_result_unknown',uncertain:!explicitRejection};
+    }
+  }
   if (!apiKey || !from) {
     return { sent: false, reason: "not_configured" };
   }
@@ -114,6 +128,7 @@ async function sendSignupEmails(groupRegistrations, env = process.env) {
 }
 
 function emailConfigured(env = process.env) {
+  if (env.EMAIL_TRANSPORT === 'cloudflare') return Boolean(env.EMAIL_ENABLED === 'true' && env.EMAIL?.send && env.MAIL_FROM);
   return Boolean(env.RESEND_API_KEY && env.MAIL_FROM);
 }
 
@@ -141,12 +156,13 @@ async function sendCampMessage(camp, parents, subject, message, env = process.en
     + (contactLine ? `<p style="color:#6e6e73">${escapeForEmail(contactLine)}</p>` : "")
     + "<p>Noah Westra Soccer Training</p>";
 
-  let sent = 0;
+  let sent = 0, uncertain = 0;
   for (const to of recipients) {
     const result = await sendEmail({ to, subject, text, html }, env);
     if (result.sent) sent += 1;
+    if (result.uncertain) uncertain += 1;
   }
-  return { sent, total: recipients.length };
+  return { sent, total: recipients.length, ...(uncertain ? {uncertain} : {}) };
 }
 
 module.exports = {

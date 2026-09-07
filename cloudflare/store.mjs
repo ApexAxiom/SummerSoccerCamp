@@ -97,15 +97,16 @@ export function createStore(db) {
     async pendingGroups() { return rows(`SELECT id FROM signup_groups WHERE status='pending_checkout' AND created_at<? AND created_at>?
       AND json_extract(checkout_params,'$.priceId') IS NOT NULL ORDER BY created_at LIMIT 10`, new Date(Date.now()-180000).toISOString(), new Date(Date.now()-23*3600000).toISOString()); },
     async pendingMail() { return rows("SELECT id FROM email_deliveries WHERE state IN ('pending','sending') AND lease_until<? ORDER BY created_at LIMIT 20", Date.now()); },
-    async claimMail(id) {
+    async claimMail(id, retryUncertain = true) {
       const now = Date.now();
+      if (!retryUncertain) await stmt("UPDATE email_deliveries SET state='delivery_unknown',last_error='provider_result_unknown' WHERE id=? AND state='sending' AND lease_until<?", id, now).run();
       await stmt("UPDATE email_deliveries SET state='delivery_unknown',last_error='retry_window_elapsed' WHERE id=? AND state!='sent' AND created_at<?", id, now-23*3600000).run();
       return stmt(`UPDATE email_deliveries SET state='sending',lease_until=?,attempts=attempts+1
-        WHERE id=? AND state IN ('pending','sending') AND lease_until<? RETURNING *`, now+60000, id, now).first();
+        WHERE id=? AND ${retryUncertain ? "state IN ('pending','sending')" : "state='pending'"} AND lease_until<? RETURNING *`, now+60000, id, now).first();
     },
     async finishMail(id, attempt, result) {
       await stmt(`UPDATE email_deliveries SET state=?,lease_until=?,provider_id=?,last_error=? WHERE id=? AND state='sending' AND attempts=?`,
-        result.sent ? 'sent' : 'pending', result.sent ? 0 : Date.now()+60000,
+        result.sent ? 'sent' : result.uncertain ? 'delivery_unknown' : 'pending', result.sent ? 0 : Date.now()+60000,
         result.id || null, result.sent ? null : (result.reason || 'unknown'), id, attempt).run();
     },
     async diagnostics() {

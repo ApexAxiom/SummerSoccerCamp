@@ -87,7 +87,7 @@ async function verifiedSession(event, group, env) {
 
 export async function deliverPending(store, env) {
   for (const { id } of await store.pendingMail()) {
-    const row = await store.claimMail(id);
+    const row = await store.claimMail(id, env.EMAIL_TRANSPORT !== 'cloudflare');
     if (!row) continue;
     const result = await email.sendEmail({ ...JSON.parse(row.payload), idempotencyKey: `noah-${id}` }, env);
     await store.finishMail(id, row.attempts, result);
@@ -198,7 +198,7 @@ async function route(request, env, ctx) {
     if (!camp) return json({ error: 'Camp not found.' }, 404);
     const parents = (await store.listRegistrationsByCamp(camp.id)).filter(row => row.status === 'paid').map(row => ({ email: row.parentEmail }));
     const result = await email.sendCampMessage(camp, parents, subject, message, env);
-    if (result.reason === 'not_configured') return json({ error: 'Email sending is not configured.', missingEnv: ['RESEND_API_KEY','MAIL_FROM'] }, 503);
+    if (result.reason === 'not_configured') return json({ error: 'Email sending is not configured.' }, 503);
     return json({ sent: result.sent || 0, total: result.total || 0 });
   }
   return json({ error: 'Method not allowed.' }, 405);
