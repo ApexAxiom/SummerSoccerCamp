@@ -48,24 +48,23 @@ CREATE INDEX email_pending ON email_deliveries(state,lease_until);
 -- Enforce capacity inside SQLite, including concurrent API calls and imports.
 CREATE TRIGGER reserve_capacity BEFORE INSERT ON signup_groups
 WHEN NEW.status IN ('pending_checkout','checkout_started','paid')
-BEGIN
-  SELECT CASE WHEN
-    NEW.child_count + COALESCE((SELECT SUM(child_count) FROM signup_groups
+  AND NEW.child_count + COALESCE((SELECT SUM(child_count) FROM signup_groups
       WHERE camp_id=NEW.camp_id AND status IN ('pending_checkout','checkout_started','paid')),0)
        > (SELECT capacity FROM camps WHERE id=NEW.camp_id)
-    THEN RAISE(ABORT,'camp_capacity') END;
+BEGIN
+  SELECT RAISE(ABORT,'camp_capacity');
 END;
 CREATE TRIGGER update_capacity BEFORE UPDATE OF status,child_count,camp_id ON signup_groups
 WHEN NEW.status IN ('pending_checkout','checkout_started','paid')
-BEGIN
-  SELECT CASE WHEN NEW.child_count + COALESCE((SELECT SUM(child_count) FROM signup_groups
+  AND NEW.child_count + COALESCE((SELECT SUM(child_count) FROM signup_groups
     WHERE camp_id=NEW.camp_id AND id!=NEW.id AND status IN ('pending_checkout','checkout_started','paid')),0)
       > (SELECT capacity FROM camps WHERE id=NEW.camp_id)
-    THEN RAISE(ABORT,'camp_capacity') END;
+BEGIN
+  SELECT RAISE(ABORT,'camp_capacity');
 END;
 CREATE TRIGGER reduce_capacity BEFORE UPDATE OF capacity ON camps
-BEGIN
-  SELECT CASE WHEN NEW.capacity < COALESCE((SELECT SUM(child_count) FROM signup_groups
+WHEN NEW.capacity < COALESCE((SELECT SUM(child_count) FROM signup_groups
     WHERE camp_id=NEW.id AND status IN ('pending_checkout','checkout_started','paid')),0)
-    THEN RAISE(ABORT,'camp_capacity') END;
+BEGIN
+  SELECT RAISE(ABORT,'camp_capacity');
 END;
