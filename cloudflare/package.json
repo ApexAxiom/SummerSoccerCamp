@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "check": "node --check worker.mjs && node --check store.mjs && node --check migrate.mjs",
+    "check": "node --check worker.mjs && node --check store.mjs && node --check migrate.mjs && node --check restore-local.mjs",
     "build": "wrangler deploy --dry-run --outdir dist"
   },
   "devDependencies": { "wrangler": "4.129.0" }

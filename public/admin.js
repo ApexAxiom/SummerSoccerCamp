@@ -281,7 +281,11 @@
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || "Could not send the message.");
-      if (result.sent > 0) {
+      if (result.uncertain > 0) {
+        statusEl.textContent = `Accepted ${result.sent} of ${result.total} messages; ${result.uncertain} delivery result${result.uncertain === 1 ? " is" : "s are"} unknown. Check delivery records before resending.`;
+      } else if (result.sent > 0 && result.sent < result.total) {
+        statusEl.textContent = `Sent to ${result.sent} of ${result.total} parents. Some messages failed; check delivery before resending.`;
+      } else if (result.sent > 0) {
         statusEl.textContent = `Sent to ${result.sent} parent${result.sent === 1 ? "" : "s"}.`;
         panel.querySelector(".msg-body").value = "";
       } else if (result.total > 0) {

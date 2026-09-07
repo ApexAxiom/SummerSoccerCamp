@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { createHmac } from 'node:crypto';
-import { importSql } from '../migrate.mjs';
+import { importSql, decodeSnapshot, verifyD1 } from '../migrate.mjs';
 import { createStore } from '../store.mjs';
 import core from '../../shared/core.js';
+import email from '../../shared/email.js';
 import worker, { deliverPending } from '../worker.mjs';
 
 // Wrangler is pinned; use the exact simulator it uses rather than a second
@@ -255,11 +256,50 @@ test('mail beyond provider idempotency window requires review without resending'
   assert.equal(mailCalls.length,count);
   assert.equal((await db.prepare("SELECT COUNT(*) n FROM email_deliveries WHERE state='delivery_unknown'").first()).n,2);
 });
+test('native Cloudflare mail preserves messages and fences uncertain sends without duplicate retry',async()=>{
+  await reset();await checkout();failMail=true;const session=[...sessions.values()][0];session.status='complete';session.payment_status='paid';
+  await sendEvent(session);await mailSettled();
+  const nativeCalls=[];
+  const native={...env,EMAIL_TRANSPORT:'cloudflare',EMAIL_ENABLED:'true',CONTACT_EMAIL:'coach@example.invalid',
+    EMAIL:{async send(message){nativeCalls.push(message);return {messageId:`native_${nativeCalls.length}`};}}};
+  assert.equal(email.emailConfigured({...native,EMAIL_ENABLED:'false'}),false);
+  assert.equal(email.emailConfigured({...native,EMAIL:undefined}),false);
+  await db.prepare('UPDATE email_deliveries SET lease_until=0').run();
+  await deliverPending(createStore(db),native);
+  assert.equal(nativeCalls.length,2);
+  assert.deepEqual(nativeCalls.map(row=>row.to[0]).sort(),['coach@example.invalid','parent@example.invalid']);
+  assert.equal(nativeCalls.every(row=>row.replyTo==='coach@example.invalid' && row.text && row.html && !row.headers),true);
+  assert.equal((await db.prepare("SELECT COUNT(*) n FROM email_deliveries WHERE state='sent' AND provider_id IS NOT NULL").first()).n,2);
+  await db.prepare("UPDATE email_deliveries SET state='pending',lease_until=0").run();
+  let attempts=0;
+  native.EMAIL.send=async()=>{attempts++;throw new Error('Unknown provider acceptance');};
+  await deliverPending(createStore(db),native);await deliverPending(createStore(db),native);
+  assert.equal(attempts,2);
+  assert.equal((await db.prepare("SELECT COUNT(*) n FROM email_deliveries WHERE state='delivery_unknown'").first()).n,2);
+  // A process lost between provider acceptance and D1 completion cannot resend.
+  await db.prepare("UPDATE email_deliveries SET state='sending',lease_until=0").run();
+  await deliverPending(createStore(db),native);assert.equal(attempts,2);
+  // The documented quota rejection proves the send was refused and may retry.
+  await db.prepare("UPDATE email_deliveries SET state='pending',lease_until=0").run();
+  native.EMAIL.send=async()=>{attempts++;throw Object.assign(new Error('Quota'),{code:'E_RATE_LIMIT_EXCEEDED'});};
+  await deliverPending(createStore(db),native);
+  assert.equal((await db.prepare("SELECT COUNT(*) n FROM email_deliveries WHERE state='pending' AND last_error='E_RATE_LIMIT_EXCEEDED'").first()).n,2);
+  native.EMAIL.send=async()=>{attempts++;return {};};
+  await db.prepare('UPDATE email_deliveries SET lease_until=0').run();
+  await deliverPending(createStore(db),native);
+  assert.equal((await db.prepare("SELECT COUNT(*) n FROM email_deliveries WHERE state='delivery_unknown'").first()).n,2);
+  assert.equal((await db.prepare('SELECT status FROM signup_groups').first()).status,'paid');
+  assert.deepEqual(await email.sendCampMessage(camp,[{email:'parent@example.invalid'}],'Update','Message',native),{sent:0,total:1,uncertain:1});
+});
 test('coach message uses only distinct paid parents and reports provider acceptance',async()=>{
   await reset();await checkout(2);const session=[...sessions.values()][0];session.status='complete';session.payment_status='paid';
   await sendEvent(session);await mailSettled();mailCalls=[];
   const response=await request(`/admin/camps/${camp.id}/message`,{method:'POST',admin:true,body:{subject:'Local schedule update',message:'Local test only'}});
   assert.deepEqual(await response.json(),{sent:1,total:1});assert.equal(mailCalls.length,1);assert.deepEqual(mailCalls[0].body.to,['parent@example.invalid']);
+  const ambiguous=await worker.fetch(new Request(`https://local.invalid/admin/camps/${camp.id}/message`,{method:'POST',headers:{authorization:`Bearer ${env.ADMIN_TOKEN}`,'content-type':'application/json'},body:JSON.stringify({subject:'Local update',message:'Local uncertainty test'})}),
+    {...env,DB:db,EMAIL_TRANSPORT:'cloudflare',EMAIL_ENABLED:'true',EMAIL:{async send(){throw new Error('Unknown acceptance');}}},{});
+  assert.equal(ambiguous.status,200);
+  assert.deepEqual(await ambiguous.json(),{sent:0,total:1,uncertain:1});
 });
 test('historical pending checkout is retained for reconciliation and never recreated',async()=>{
   await reset();
@@ -289,6 +329,11 @@ test('migration rejects duplicate and inconsistent records and preserves empty d
   assert.throws(()=>importSql({camps:[camp,camp],registrations:[]}),/Duplicate/);
   assert.throws(()=>importSql({camps:[{...camp,reservedCount:1}],registrations:[]}),/counters/);
   const result=importSql({camps:[camp],registrations:[]});assert.equal(result.counts.camps,1);assert.match(result.sql,/INSERT INTO camps/);
+  const typed={format:'noah-dynamodb-v1',camps:[{id:{S:'typed'},details:{M:{waiver:{BOOL:true},optional:{NULL:true},ages:{L:[{N:'8'}]}}}}],registrations:[]};
+  assert.deepEqual(decodeSnapshot(typed).camps,[{id:'typed',details:{waiver:true,optional:null,ages:[8]}}]);
+  for(const number of ['9007199254740993','0.10000000000000001']) assert.throws(()=>decodeSnapshot({...typed,camps:[{amount:{N:number}}]}),/precision/);
+  assert.throws(()=>decodeSnapshot({...typed,camps:[{mixed:{S:'x',N:'1'}}]}),/Malformed/);
+  assert.throws(()=>decodeSnapshot({...typed,camps:[{set:{SS:['x']}}]}),/Unsupported/);
 });
 test('private snapshot SQL restores closed camps and every paid registration field in D1',async()=>{
   await reset();
@@ -301,6 +346,10 @@ test('private snapshot SQL restores closed camps and every paid registration fie
   assert.deepEqual((await createStore(db).listAllRegistrations()).sort((a,b)=>a.id.localeCompare(b.id)),registrations);
   assert.equal((await createStore(db).listCamps())[0].paidCount,2);
   assert.equal((await db.prepare('SELECT COUNT(*) n FROM email_deliveries').first()).n,0);
+  const query=async sql=>(await db.prepare(sql).all()).results;
+  assert.equal((await verifyD1(source,query)).verified,true);
+  await db.prepare("UPDATE signup_groups SET payment='{}'").run();
+  await assert.rejects(verifyD1(source,query),/payment/);
 });
 test('disabled Worker has no camp, checkout, webhook, or admin mutation path',async()=>{
   const disabled = new Miniflare(convertV4MiniflareOptions({modules:true,script:readFileSync(new URL('../dist/worker.js',import.meta.url),'utf8'),compatibilityDate:'2026-09-06',compatibilityFlags:['nodejs_compat'],bindings:{...env,BACKEND_ENABLED:'false'},d1Databases:{DB:'inert-local-test'},outboundService:()=>{throw new Error('Inert backend made an outbound call.');}}));

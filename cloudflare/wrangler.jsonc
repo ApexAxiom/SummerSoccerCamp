@@ -8,9 +8,12 @@
   "preview_urls": false,
   "vars": {
     "BACKEND_ENABLED": "false",
+    "EMAIL_TRANSPORT": "cloudflare",
+    "EMAIL_ENABLED": "false",
     "APP_URL": "https://www.noahscompany.com",
     "ALLOWED_ORIGINS": "https://noahscompany.com,https://www.noahscompany.com"
   },
+  "send_email": [{"name":"EMAIL","allowed_sender_addresses":["noreply@notify.noahscompany.com"]}],
   "d1_databases": [{
     "binding": "DB",
     "database_name": "noahscompany",
