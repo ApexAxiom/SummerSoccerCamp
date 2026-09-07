@@ -116,7 +116,9 @@ automatically resend historical confirmations.
 2. Create actual D1 and apply the reviewed schema. Provision the actual Worker
    secrets and public configuration. Deploy inert and verify health says
    `enabled:false`; every data/payment/coach route must return 503. The manual
-   main-only Production deployment does not apply schema or import data.
+  main-only Production deployment does not apply schema or import data.
+   Both release workflows verify the current main SHA through authenticated
+   GitHub API access immediately before uploading; a queued stale run stops.
 3. Run isolated Stripe **test-mode** checkout/webhook acceptance and owner-only
    test mail. A test-mode Worker must use its own database, test API/signing keys
    and test prices; do not overwrite production secrets or submit test campers
